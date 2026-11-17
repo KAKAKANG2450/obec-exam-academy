@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>OBEC Exam Academy — นักวิชาการคอมพิวเตอร์ สพฐ.</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- หน้าจอเข้าสู่ระบบด้วย Email (แสดงเมื่อยังไม่ได้ Login) -->
+    <div id="auth-screen" class="auth-overlay" hidden>
+        <div class="auth-card">
+            <div class="auth-brand">
+                <div class="brand-badge">OE</div>
+                <div>
+                    <div class="brand-title">OBEC Exam Academy</div>
+                    <div class="brand-sub">นักวิชาการคอมพิวเตอร์ สพฐ. · ม.38 ค (2)</div>
+                </div>
+            </div>
+
+            <div class="auth-tabs" role="tablist">
+                <button type="button" class="auth-tab active" data-auth-mode="login">เข้าสู่ระบบ</button>
+                <button type="button" class="auth-tab" data-auth-mode="register">สมัครสมาชิกใหม่</button>
+            </div>
+
+            <form id="auth-form" novalidate>
+                <div id="auth-name-group" class="form-group" hidden>
+                    <label for="auth-name">ชื่อที่แสดง (ไม่บังคับ)</label>
+                    <input id="auth-name" type="text" placeholder="เช่น ครูคอม สพฐ. หรือชื่อเล่น" autocomplete="name">
+                </div>
+
+                <div class="form-group">
+                    <label for="auth-email">อีเมล (Email) <span class="req">*</span></label>
+                    <input id="auth-email" type="email" placeholder="name@example.com" required autocomplete="email">
+                </div>
+
+                <div class="form-group">
+                    <label for="auth-pass">รหัสผ่าน / PIN (อย่างน้อย 4 ตัวอักษร) <span class="req">*</span></label>
+                    <div class="pass-wrap">
+                        <input id="auth-pass" type="password" placeholder="••••••" required autocomplete="current-password">
+                        <button type="button" id="toggle-pass" class="icon-btn" aria-label="แสดง/ซ่อนรหัสผ่าน">👁️</button>
+                    </div>
+                </div>
+
+                <div id="auth-error" class="auth-error" role="alert" hidden></div>
+
+                <button type="submit" id="auth-submit" class="btn-primary full-btn">เข้าสู่ระบบด้วย Email</button>
+            </form>
+
+            <div class="auth-divider"><span>หรือ</span></div>
+
+            <button type="button" id="demo-login-btn" class="btn-outline full-btn">
+                🚀 ทดลองใช้งานทันที (บัญชีสาธิต)
+            </button>
+
+            <div id="saved-accounts-box" class="saved-accounts" hidden>
+                <div class="saved-title">บัญชีที่เคยเข้าสู่ระบบในเครื่องนี้</div>
+                <div id="saved-accounts-list" class="saved-list"></div>
+            </div>
+
+            <p class="auth-note">
+                ข้อมูลความก้าวหน้า คะแนนสอบ และ Streak จะถูกแยกเก็บตามบัญชี Email ของคุณโดยอัตโนมัติ
+            </p>
+        </div>
+    </div>
+
+    <!-- โครงสร้างแอปหลัก -->
+    <div id="app-shell" class="app-shell">
+        <!-- แถบเมนูด้านซ้าย (Sidebar) -->
+        <aside id="sidebar" class="sidebar" aria-label="เมนูหลัก">
+            <div class="sb-header">
+                <a href="#home" class="brand-link">
+                    <div class="brand-badge">OE</div>
+                    <div class="brand-text">
+                        <div class="brand-title">OBEC Exam Academy</div>
+                        <div class="brand-sub">นักวิชาการคอมพิวเตอร์ สพฐ.</div>
+                    </div>
+                </a>
+                <button type="button" id="sb-close" class="sb-close" aria-label="ปิดเมนู">✕</button>
+            </div>
+
+            <!-- การ์ดเลือกสนามสอบ / วันสอบ -->
+            <div class="sb-section">
+                <div class="sb-label">สนามสอบเป้าหมาย</div>
+                <div class="exam-track-grid">
+                    <button type="button" id="exam-card-btn" class="exam-pill active" title="คลิกเพื่อตั้งวันสอบ">
+                        <div class="exam-pill-title">สพฐ. ม.38 ค (2)</div>
+                        <div class="exam-pill-sub" id="sb-countdown-text">ตั้งวันสอบ · คลิกแก้ไข</div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ค้นหาหัวข้ออย่างรวดเร็ว -->
+            <div class="sb-search-wrap">
+                <input id="sq" class="sb-search" type="search" placeholder="🔍 ค้นหาบทเรียน / มาตรา...">
+            </div>
+
+            <!-- เมนูนำทางแบบไดนามิก -->
+            <nav id="nav" class="sb-nav"></nav>
+
+            <div class="sb-footer">
+                ข้อมูลแยกเก็บตาม Email · สำรองข้อมูลได้ที่หน้า Progress
+            </div>
+        </aside>
+
+        <!-- พื้นหลังมืดเมื่อเปิดเมนูบนมือถือ -->
+        <div id="backdrop" class="backdrop"></div>
+
+        <!-- พื้นที่หลักด้านขวา -->
+        <div class="content-area">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button type="button" id="menu" class="menu-btn" aria-label="เปิดเมนู">☰</button>
+                    <h2 id="page-title" class="page-title">Dashboard</h2>
+                </div>
+
+                <div class="topbar-right">
+                    <div class="stat-chip streak" title="สถิติเรียนต่อเนื่อง">
+                        <span>🔥</span><b id="hdr-streak">0</b>
+                    </div>
+                    <div class="stat-chip xp" title="คะแนนประสบการณ์สะสม">
+                        <span>💎</span><b id="hdr-xp">0</b>
+                    </div>
+                    <button type="button" id="hdr-check" class="tool-btn ok-tint" title="ภารกิจวันนี้" aria-label="ภารกิจวันนี้">✓</button>
+                    <button type="button" id="fa" class="tool-btn" title="ลดขนาดตัวอักษร">Aa−</button>
+                    <button type="button" id="fb" class="tool-btn" title="เพิ่มขนาดตัวอักษร">Aa+</button>
+                    <button type="button" id="th" class="tool-btn" title="สลับโหมดสว่าง/มืด">🌙</button>
+
+                    <!-- เมนูบัญชีผู้ใช้ (Email) -->
+                    <div class="user-menu-wrap">
+                        <button type="button" id="user-menu-btn" class="user-chip" aria-expanded="false">
+                            <span id="user-avatar" class="user-avatar">U</span>
+                            <span id="user-display-name" class="user-name">ผู้ใช้งาน</span>
+                            <span class="caret">▾</span>
+                        </button>
+                        <div id="user-dropdown" class="user-dropdown" hidden>
+                            <div class="ud-header">
+                                <div id="ud-name" class="ud-name">ผู้ใช้งาน</div>
+                                <div id="ud-email" class="ud-email">user@example.com</div>
+                            </div>
+                            <a href="#prog" class="ud-item">📊 สถิติ &amp; สำรองข้อมูล</a>
+                            <button type="button" id="ud-exam-date" class="ud-item">📅 ตั้งวันสอบเป้าหมาย</button>
+                            <button type="button" id="ud-switch" class="ud-item">🔄 สลับบัญชี Email</button>
+                            <div class="ud-sep"></div>
+                            <button type="button" id="ud-logout" class="ud-item danger">🚪 ออกจากระบบ</button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <main id="main" class="main-container"></main>
+        </div>
+    </div>
+
+    <!-- แถบแท็บด้านล่างสำหรับมือถือ -->
+    <div id="tabs" class="mobile-tabs"></div>
+
+    <!-- Modal ตั้งวันสอบ -->
+    <div id="date-modal" class="modal-overlay" hidden>
+        <div class="modal-card">
+            <h3>📅 ตั้งวันสอบเป้าหมาย สพฐ.</h3>
+            <p class="mu">เลือกวันสอบจริงของคุณเพื่อแสดงตัวนับถอยหลังบนหน้า Dashboard</p>
+            <div class="form-group">
+                <label for="exam-date-input">วันที่สอบข้อเขียน</label>
+                <input type="date" id="exam-date-input">
+            </div>
+            <div class="row end">
+                <button type="button" id="date-clear-btn" class="btn-outline">ล้างวันสอบ</button>
+                <button type="button" id="date-cancel-btn" class="btn-outline">ยกเลิก</button>
+                <button type="button" id="date-save-btn" class="btn-primary">บันทึก</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
