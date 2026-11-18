@@ -1,5 +1,5 @@
 /* ==========================================================================
-   OBEC Exam Academy — Core Application Logic (4 Sections + All-Agencies Jobs)
+   OBEC Exam Academy — Core Application Logic (Separated 4-Section Architecture)
    ========================================================================== */
 
 (function () {
@@ -18,13 +18,6 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
-    }
-
-    function safeUrl(url) {
-        var u = String(url || '').trim();
-        if (!u) return '#';
-        if (/^https?:\/\//i.test(u)) return u;
-        return 'https://' + u;
     }
 
     function hashSecret(str) {
@@ -68,12 +61,16 @@
         set: function (key, val) {
             try {
                 localStorage.setItem(key, JSON.stringify(val));
-            } catch (e) {}
+            } catch (e) { }
         }
     };
 
     /* ----------------------------------------------------------------------
-       Data Indexing & Automatic Separation into 4 Parts + Jobs Board
+       Data Indexing & Automatic Separation into 4 Parts:
+       1. READING_TOPICS (ส่วนเนื้อหาอ่าน)
+       2. ALL_VIDEOS (ส่วนคลิปติว YouTube)
+       3. CHAPTER_QUIZZES (ส่วนแบบทดสอบท้ายบท)
+       4. PAST_EXAM_SETS & ALL_QUESTIONS (ส่วนข้อสอบเก่า)
        ---------------------------------------------------------------------- */
     var CAT_META = {
         a: { color: '#2563eb', icon: 'ก', short: 'ภาค ก' },
@@ -109,6 +106,7 @@
             }
         });
 
+        // ลบหัวข้อ <h3> ของส่วนวิดีโอที่ไม่มีเนื้อหาตามหลังออก เพื่อไม่ให้ค้างในหน้าอ่าน
         while (tmp.lastElementChild && tmp.lastElementChild.tagName === 'H3') {
             tmp.lastElementChild.remove();
         }
@@ -127,6 +125,7 @@
                 }
             });
 
+            // แยกชุดข้อสอบเก่า (past_*) ออกจากบทเรียนเนื้อหาอ่าน
             if (pastQuizBlk) {
                 PAST_EXAM_SETS.push({
                     id: pastQuizBlk.id,
@@ -171,6 +170,7 @@
                 });
             }
 
+            // รวมข้อสอบและ Flashcards ทั้งหมดเข้าคลังกลาง
             sec.b.forEach(function (blk) {
                 if (blk.k === 'quiz' && Array.isArray(blk.qs)) {
                     blk.qs.forEach(function (q, qIdx) {
@@ -204,12 +204,6 @@
         });
     });
 
-    function getAllJobs() {
-        var base = Array.isArray(window.DEFAULT_JOBS) ? window.DEFAULT_JOBS : [];
-        var custom = (P && Array.isArray(P.customJobs)) ? P.customJobs : [];
-        return custom.concat(base);
-    }
-
     /* ----------------------------------------------------------------------
        Email Authentication & Per-User Progress State
        ---------------------------------------------------------------------- */
@@ -225,9 +219,6 @@
             qLog: {},       // ประวัติการตอบรายข้อ { "a0_0": true/false }
             mistakes: [],   // รายการข้อที่เคยตอบผิด [uid, ...]
             fc: {},         // บัตรคำที่จำได้ { "b6": [0, 1] }
-            customJobs: [], // ประกาศรับสมัครงานที่ผู้ใช้เพิ่มเอง
-            jobStatus: {},  // สถานะติดตามงาน { "job_id": "saved" | "applied" }
-            jobDates: {},   // วันที่รับสมัครที่ผู้ใช้อัปเดตเอง { "job_id": "20 พ.ย. – 4 ธ.ค. 2569" }
             xp: 0,          // คะแนน XP สะสม
             streak: 0,      // วันต่อเนื่อง
             activeDays: {}, // ประวัติวันที่เข้าเรียน { "2026-11-18": true }
@@ -253,9 +244,6 @@
         merged.qLog = merged.qLog || {};
         merged.mistakes = Array.isArray(merged.mistakes) ? merged.mistakes : [];
         merged.fc = merged.fc || {};
-        merged.customJobs = Array.isArray(merged.customJobs) ? merged.customJobs : [];
-        merged.jobStatus = merged.jobStatus || {};
-        merged.jobDates = merged.jobDates || {};
         merged.activeDays = merged.activeDays || {};
         merged.xp = Number(merged.xp) || 0;
         merged.streak = Number(merged.streak) || 0;
@@ -726,15 +714,14 @@
     }
 
     /* ----------------------------------------------------------------------
-       Sidebar & Mobile Tabs Navigation
+       Sidebar & Mobile Tabs Navigation (4 Separated Sections)
        ---------------------------------------------------------------------- */
     function renderSidebar(currentRoute) {
         var catIcons = { a: '📐', b: '⚖️', c: '💻', d: '🎓' };
         var html = '';
 
-        html += '<div class="sb-group-title">ภาพรวม &amp; แหล่งงาน</div>';
+        html += '<div class="sb-group-title">ภาพรวม</div>';
         html += navLink('#home', '⊞', 'Dashboard', currentRoute === 'home');
-        html += navLink('#jobs', '📢', 'ประกาศรับตำแหน่งงาน', currentRoute === 'jobs', getAllJobs().length);
 
         html += '<div class="sb-group-title">1. ส่วนเนื้อหาอ่าน</div>';
         D.forEach(function (cat) {
@@ -796,10 +783,10 @@
         var firstTopic = READING_TOPICS[0] ? ('#' + READING_TOPICS[0].k) : '#home';
         var items = [
             { href: '#home', ic: '🏠', label: 'หน้าหลัก', on: currentRoute === 'home' },
-            { href: '#jobs', ic: '📢', label: 'ประกาศรับสมัคร', on: currentRoute === 'jobs' },
             { href: firstTopic, ic: '📖', label: 'เนื้อหา', on: /^[abcd]\//.test(currentRoute) },
             { href: '#videos', ic: '🎬', label: 'คลิปติว', on: currentRoute === 'videos' },
-            { href: '#past-exams', ic: '📜', label: 'ข้อสอบ', on: currentRoute.indexOf('past-exams') === 0 || currentRoute.indexOf('quizzes') === 0 || currentRoute === 'qbank' || currentRoute === 'mock' }
+            { href: '#quizzes', ic: '📝', label: 'แบบทดสอบ', on: currentRoute.indexOf('quizzes') === 0 },
+            { href: '#past-exams', ic: '📜', label: 'ข้อสอบเก่า', on: currentRoute.indexOf('past-exams') === 0 || currentRoute === 'qbank' || currentRoute === 'mock' }
         ];
         $('#tabs').innerHTML = items.map(function (it) {
             return '<a href="' + it.href + '" class="' + (it.on ? 'active' : '') + '"><b>' + it.ic + '</b><span>' + it.label + '</span></a>';
@@ -820,9 +807,9 @@
         var cd = getCountdownInfo();
         var countdownHtml = cd
             ? '<div class="countdown-num">' + (cd.days >= 0 ? cd.days : 0) + '</div>' +
-              '<div class="countdown-label"><b>' + (cd.days >= 0 ? 'วัน ถึงวันสอบข้อเขียน' : 'ถึงกำหนดวันสอบแล้ว') + '</b><br>' + esc(cd.fullText) + '</div>'
+            '<div class="countdown-label"><b>' + (cd.days >= 0 ? 'วัน ถึงวันสอบข้อเขียน สพฐ.' : 'ถึงกำหนดวันสอบแล้ว') + '</b><br>' + esc(cd.fullText) + '</div>'
             : '<div class="countdown-num">📅</div>' +
-              '<div class="countdown-label"><b>ตั้งวันสอบเป้าหมาย</b><br>คลิกเพื่อกำหนดวันสอบนับถอยหลัง</div>';
+            '<div class="countdown-label"><b>ตั้งวันสอบเป้าหมาย สพฐ.</b><br>คลิกเพื่อกำหนดวันสอบนับถอยหลัง</div>';
 
         var heroSvg =
             '<svg class="hero-art" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">' +
@@ -895,32 +882,25 @@
         $('#main').innerHTML =
             '<div class="dash-layout">' +
             '  <div class="dash-main">' +
+            '    <!-- 1. Hero Card -->' +
             '    <div class="card hero-card">' +
             '      ' + heroSvg +
             '      <div class="hero-body">' +
             '        <h1>วันนี้ขอแค่ 30 นาที</h1>' +
-            '        <p>ครบทั้งประกาศรับสมัครทุกหน่วยงาน เนื้อหาอ่าน คลิปติว แบบทดสอบท้ายบท และคลังข้อสอบเก่า ' + ALL_QUESTIONS.length + ' ข้อ</p>' +
+            '        <p>แยกส่วนอ่านเนื้อหา ดูคลิปติว ทำแบบทดสอบท้ายบท และตะลุยคลังข้อสอบเก่า 154 ข้อได้อย่างเป็นระบบ</p>' +
             '        <div class="countdown-box" id="hero-countdown-btn" title="คลิกเพื่อตั้งวันสอบ">' +
             '          ' + countdownHtml +
             '        </div>' +
             '        <div class="hero-actions">' +
             '          <a href="#' + nextTopic.k + '" class="btn-primary">📖 อ่านเนื้อหาต่อ</a>' +
-            '          <a href="#jobs" class="btn-outline">📢 ประกาศรับสมัครงาน</a>' +
             '          <a href="#videos" class="btn-outline">🎬 คลิปติว (' + ALL_VIDEOS.length + ')</a>' +
+            '          <a href="#quizzes" class="btn-outline">📝 แบบทดสอบ</a>' +
             '          <a href="#past-exams" class="btn-outline">📜 ข้อสอบเก่า</a>' +
             '        </div>' +
             '      </div>' +
             '    </div>' +
 
-            '    <a href="#jobs" class="highlight-banner">' +
-            '      <div class="hb-icon">📢</div>' +
-            '      <div class="hb-text">' +
-            '        <div class="hb-title">ศูนย์รวมประกาศรับสมัครตำแหน่ง "นักวิชาการคอมพิวเตอร์" ทุกหน่วยงาน</div>' +
-            '        <div class="hb-sub">รวมทางเข้าเว็บรับสมัคร ก.พ. · สพฐ. ม.38 ค.(2) · ท้องถิ่น · สาธารณสุข · มหาวิทยาลัย · รัฐวิสาหกิจ พร้อมบันทึกวันที่รับสมัครและติดตามสถานะ</div>' +
-            '      </div>' +
-            '      <div style="color:var(--mu);font-weight:800">›</div>' +
-            '    </a>' +
-
+            '    <!-- 2. Quick Access 4 Separated Sections -->' +
             '    <div class="section-heading">ทางลัดเข้าใช้งาน 4 ส่วนหลัก</div>' +
             '    <div class="cat-grid">' +
             '      <a href="#' + nextTopic.k + '" class="cat-card" style="--cat-color:#2563eb">' +
@@ -945,6 +925,7 @@
             '      </a>' +
             '    </div>' +
 
+            '    <!-- 3. Next Lesson Card -->' +
             '    <div class="card continue-card">' +
             '      <div class="cont-icon">📖</div>' +
             '      <div class="cont-body">' +
@@ -956,10 +937,12 @@
             '      <a href="#' + nextTopic.k + '" class="btn-primary">เริ่มอ่าน</a>' +
             '    </div>' +
 
+            '    <!-- 4. Categories Grid -->' +
             '    <div class="section-heading">เนื้อหาอ่านแยกตาม 4 หมวดสอบ</div>' +
             '    <div class="cat-grid">' + catCardsHtml + '</div>' +
             '  </div>' +
 
+            '  <!-- Right Column Widgets -->' +
             '  <div class="dash-side">' +
             '    <div class="card">' +
             '      <div class="streak-top">' +
@@ -1021,310 +1004,6 @@
     }
 
     /* ----------------------------------------------------------------------
-       Jobs & Recruitment Announcements Page (ประกาศรับตำแหน่งนักวิชาการคอมพิวเตอร์)
-       ---------------------------------------------------------------------- */
-    function renderJobsPage() {
-        $('#page-title').textContent = 'ประกาศรับตำแหน่งงาน';
-        var selectedCat = 'all';
-        var searchQuery = '';
-        var showAddForm = false;
-
-        if (!P.jobDates || typeof P.jobDates !== 'object') {
-            P.jobDates = {};
-        }
-
-        var portals = Array.isArray(window.JOB_PORTALS) ? window.JOB_PORTALS : [];
-
-        function draw() {
-            var allJobs = getAllJobs();
-            var categories = ['สพฐ. ม.38 ค.(2)', 'ก.พ. / กรมส่วนกลาง', 'ท้องถิ่น (อปท.)', 'สาธารณสุข / รพ.', 'มหาวิทยาลัย (อว.)', 'พนักงานราชการ', 'รัฐวิสาหกิจ'];
-
-            var filteredJobs = allJobs.filter(function (j) {
-                var st = P.jobStatus[j.id] || '';
-                var curApplyDate = P.jobDates[j.id] || j.applyDate || j.schedule || '';
-                if (selectedCat === 'tracked') {
-                    if (!st) return false;
-                } else if (selectedCat !== 'all') {
-                    if (j.cat !== selectedCat) return false;
-                }
-                if (searchQuery) {
-                    var hay = (j.agency + ' ' + j.title + ' ' + j.cat + ' ' + j.empType + ' ' + curApplyDate).toLowerCase();
-                    if (hay.indexOf(searchQuery) < 0) return false;
-                }
-                return true;
-            });
-
-            var trackedCount = allJobs.filter(function (j) { return !!P.jobStatus[j.id]; }).length;
-
-            var portalsHtml = portals.map(function (p) {
-                return (
-                    '<div class="card" style="border-left:4px solid ' + esc(p.color) + ';display:flex;flex-direction:column;justify-content:space-between;gap:10px">' +
-                    '  <div>' +
-                    '    <span style="font-size:0.78em;font-weight:700;padding:2px 8px;border-radius:999px;background:' + esc(p.color) + '18;color:' + esc(p.color) + '">' + esc(p.tag) + '</span>' +
-                    '    <div style="font-weight:700;font-size:1.02em;margin:6px 0 4px">' + esc(p.agency) + '</div>' +
-                    '    <p class="mu" style="font-size:0.88em;margin:0 0 6px">' + esc(p.desc) + '</p>' +
-                    '    <div style="font-size:0.82em;color:var(--ok)">💡 ' + esc(p.searchTip) + '</div>' +
-                    '  </div>' +
-                    '  <div>' +
-                    '    <a href="' + esc(safeUrl(p.url)) + '" target="_blank" rel="noopener noreferrer" class="btn-outline" style="width:100%;justify-content:center;text-align:center">🌐 เปิดเว็บไซต์รับสมัครทางการ ↗</a>' +
-                    '  </div>' +
-                    '</div>'
-                );
-            }).join('');
-
-            var filterBtns =
-                '<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:12px">' +
-                '<button type="button" class="' + (selectedCat === 'all' ? 'btn-primary' : 'btn-outline') + '" data-jcat="all">ทั้งหมด (' + allJobs.length + ')</button>' +
-                '<button type="button" class="' + (selectedCat === 'tracked' ? 'btn-primary' : 'btn-outline') + '" data-jcat="tracked">🔖 ที่บันทึก/สมัครแล้ว (' + trackedCount + ')</button>' +
-                categories.map(function (c) {
-                    return '<button type="button" class="' + (selectedCat === c ? 'btn-primary' : 'btn-outline') + '" data-jcat="' + esc(c) + '">' + esc(c) + '</button>';
-                }).join('') +
-                '</div>';
-
-            var addFormHtml = showAddForm
-                ? '<div class="card" style="border:2px dashed var(--pr);background:var(--bg)">' +
-                  '  <h3 style="margin-top:0">➕ เพิ่มประกาศรับสมัครงานที่ต้องการติดตาม</h3>' +
-                  '  <p class="mu" style="font-size:0.88em">บันทึกประกาศรับสมัครจริงที่คุณพบ (เช่น สพป.จังหวัด, โรงพยาบาล, เทศบาล, กรมต่าง ๆ) พร้อมระบุวันที่รับสมัคร</p>' +
-                  '  <form id="custom-job-form">' +
-                  '    <div class="form-group">' +
-                  '      <label>ชื่อหน่วยงาน / จังหวัด <span class="req">*</span></label>' +
-                  '      <input type="text" id="cj-agency" placeholder="เช่น สำนักงานเขตพื้นที่การศึกษาประถมศึกษาสุราษฎร์ธานี เขต 1" required>' +
-                  '    </div>' +
-                  '    <div class="row" style="gap:10px;flex-wrap:wrap">' +
-                  '      <div class="form-group" style="flex:1;min-width:200px">' +
-                  '        <label>สังกัด / หมวดหมู่</label>' +
-                  '        <select id="cj-cat" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx)">' +
-                  categories.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('') +
-                  '        </select>' +
-                  '      </div>' +
-                  '      <div class="form-group" style="flex:1;min-width:200px">' +
-                  '        <label>ประเภทการจ้าง</label>' +
-                  '        <input type="text" id="cj-emptype" value="ข้าราชการ / พนักงานราชการ">' +
-                  '      </div>' +
-                  '    </div>' +
-                  '    <div class="form-group">' +
-                  '      <label>ชื่อตำแหน่ง &amp; รายละเอียดเพิ่มเติม</label>' +
-                  '      <input type="text" id="cj-title" value="นักวิชาการคอมพิวเตอร์ (จำนวน 1 อัตรา)">' +
-                  '    </div>' +
-                  '    <div class="row" style="gap:10px;flex-wrap:wrap">' +
-                  '      <div class="form-group" style="flex:1;min-width:200px">' +
-                  '        <label>📅 วันที่เปิด–ปิดรับสมัคร <span class="req">*</span></label>' +
-                  '        <input type="text" id="cj-schedule" placeholder="เช่น 20 พ.ย. – 4 ธ.ค. 2569" required>' +
-                  '      </div>' +
-                  '      <div class="form-group" style="flex:1;min-width:200px">' +
-                  '        <label>วันสอบข้อเขียน (ถ้าทราบ — ใช้ตั้งนับถอยหลังได้)</label>' +
-                  '        <input type="date" id="cj-examdate">' +
-                  '      </div>' +
-                  '    </div>' +
-                  '    <div class="form-group">' +
-                  '      <label>ลิงก์ประกาศรับสมัคร (URL หรือ PDF)</label>' +
-                  '      <input type="url" id="cj-url" placeholder="https://...">' +
-                  '    </div>' +
-                  '    <div class="row end" style="gap:8px">' +
-                  '      <button type="button" id="cj-cancel" class="btn-outline">ยกเลิก</button>' +
-                  '      <button type="submit" class="btn-primary">💾 บันทึกประกาศรับสมัคร</button>' +
-                  '    </div>' +
-                  '  </form>' +
-                  '</div>'
-                : '';
-
-            var jobsListHtml = filteredJobs.map(function (j) {
-                var st = P.jobStatus[j.id] || '';
-                var isCustom = String(j.id).indexOf('custom_job_') === 0;
-                var displayApplyDate = P.jobDates[j.id] || j.applyDate || j.schedule || 'ระบุวันที่รับสมัครได้ด้วยปุ่มด้านล่าง';
-                var statusPill = '';
-
-                if (st === 'applied') {
-                    statusPill = '<span style="font-size:0.8em;font-weight:700;padding:3px 10px;border-radius:999px;background:#dcfce7;color:#15803d">✅ สมัครแล้ว</span>';
-                } else if (st === 'saved') {
-                    statusPill = '<span style="font-size:0.8em;font-weight:700;padding:3px 10px;border-radius:999px;background:#dbeafe;color:#1d4ed8">🔖 กำลังติดตาม</span>';
-                } else if (j.statusText) {
-                    statusPill = '<span style="font-size:0.8em;font-weight:700;padding:3px 10px;border-radius:999px;background:#fef3c7;color:#b45309">📣 ' + esc(j.statusText) + '</span>';
-                }
-
-                return (
-                    '<div class="card">' +
-                    '  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">' +
-                    '    <div>' +
-                    '      <span style="font-size:0.8em;font-weight:700;color:var(--pr)">🏷️ ' + esc(j.cat) + ' · ' + esc(j.empType) + '</span>' +
-                    (isCustom ? ' <span style="font-size:0.75em;padding:2px 6px;border-radius:6px;background:var(--bg);border:1px solid var(--bd)">เพิ่มเอง</span>' : '') +
-                    '      <h3 style="margin:6px 0 4px">' + esc(j.title) + '</h3>' +
-                    '      <div style="font-weight:600;color:var(--tx);margin-bottom:8px">🏛️ ' + esc(j.agency) + '</div>' +
-                    '    </div>' +
-                    '    <div>' + statusPill + '</div>' +
-                    '  </div>' +
-                    '  <div style="padding:10px 12px;margin-bottom:10px;border-radius:10px;background:var(--bg);border-left:4px solid var(--pr);font-size:0.92em">' +
-                    '    <b>📅 วันที่รับสมัคร:</b> <span style="color:var(--pr);font-weight:700">' + esc(displayApplyDate) + '</span>' +
-                    '  </div>' +
-                    '  <div style="font-size:0.9em;line-height:1.6;margin-bottom:12px">' +
-                    (j.qual ? '    <div><b>🎓 คุณวุฒิ:</b> ' + esc(j.qual) + '</div>' : '') +
-                    (j.examReq ? '    <div><b>📝 เงื่อนไขการสอบ:</b> ' + esc(j.examReq) + '</div>' : '') +
-                    '  </div>' +
-                    '  <div class="row" style="gap:8px;flex-wrap:wrap">' +
-                    (j.url ? '<a href="' + esc(safeUrl(j.url)) + '" target="_blank" rel="noopener noreferrer" class="btn-primary">🔗 ดูประกาศ / สมัครสอบ ↗</a>' : '') +
-                    '    <button type="button" class="btn-outline" data-edit-apply="' + esc(j.id) + '">✏️ อัปเดตวันที่รับสมัคร</button>' +
-                    '    <button type="button" class="' + (st === 'saved' ? 'btn-primary' : 'btn-outline') + '" data-job-act="saved" data-job-id="' + esc(j.id) + '">🔖 บันทึกติดตาม</button>' +
-                    '    <button type="button" class="' + (st === 'applied' ? 'btn-primary' : 'btn-outline') + '" data-job-act="applied" data-job-id="' + esc(j.id) + '">✅ สมัครแล้ว</button>' +
-                    (j.examDate ? '<button type="button" class="btn-outline" data-set-exam="' + esc(j.examDate) + '">📅 ตั้งวันสอบ (' + esc(j.examDate) + ')</button>' : '') +
-                    (isCustom ? '<button type="button" class="btn-outline" style="color:var(--rose)" data-del-job="' + esc(j.id) + '">🗑️ ลบ</button>' : '') +
-                    '  </div>' +
-                    '</div>'
-                );
-            }).join('');
-
-            $('#main').innerHTML =
-                '<div class="lesson-wrap">' +
-                '  <div class="card">' +
-                '    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">' +
-                '      <div>' +
-                '        <h1>📢 ประกาศรับตำแหน่งนักวิชาการคอมพิวเตอร์ ทุกหน่วยงาน</h1>' +
-                '        <p class="mu" style="margin:0">รวมช่องทางสมัครงานราชการ-รัฐวิสาหกิจอย่างเป็นทางการ พร้อมระบบบันทึกวันที่รับสมัครและติดตามสถานะ</p>' +
-                '      </div>' +
-                '      <button type="button" id="toggle-add-job-btn" class="btn-primary">' + (showAddForm ? '✕ ปิดฟอร์ม' : '➕ เพิ่มประกาศรับสมัครเอง') + '</button>' +
-                '    </div>' +
-                '  </div>' +
-
-                addFormHtml +
-
-                '  <div class="section-heading">1. เว็บไซต์ประกาศรับสมัครงานอย่างเป็นทางการ (แยกตามสังกัด)</div>' +
-                '  <div class="cat-grid">' + portalsHtml + '</div>' +
-
-                '  <div class="section-heading" style="margin-top:24px">2. รายการตำแหน่งเปิดรับสมัคร &amp; บันทึกติดตามของฉัน</div>' +
-                '  <div class="card">' +
-                '    <input type="search" id="job-search-input" class="sb-search" value="' + esc(searchQuery) + '" placeholder="🔍 ค้นหาชื่อหน่วยงาน, จังหวัด, วันที่รับสมัคร, ข้าราชการ...">' +
-                filterBtns +
-                '  </div>' +
-                (jobsListHtml || '<div class="card"><p class="mu" style="text-align:center;padding:18px 0">ไม่พบรายการประกาศรับสมัครที่ตรงกับเงื่อนไข</p></div>') +
-
-                '  <div class="card">' +
-                '    <h3>📋 เช็กลิสต์เอกสารและคุณสมบัติก่อนกดสมัครสอบภาครัฐ</h3>' +
-                '    <ul>' +
-                '      <li><b>ใบรับรองคุณวุฒิ ก.พ.:</b> ตรวจสอบชื่อปริญญาและสาขาวิชาในระบบ <code>accreditation.ocsc.go.th</code> ว่าตรงตาม "สาขาวิชาใดวิชาหนึ่งทางคอมพิวเตอร์"</li>' +
-                '      <li><b>วันสำเร็จการศึกษา:</b> ต้องได้รับอนุมัติปริญญาบัตรจากสภามหาวิทยาลัย <b>ก่อนหรือภายในวันปิดรับสมัคร</b> (ยึดวันที่อนุมัติใน Transcript เป็นหลัก)</li>' +
-                '      <li><b>หนังสือรับรองผลสอบผ่าน ภาค ก:</b> กรณีสมัครข้าราชการพลเรือนสามัญ (ก.พ.) ต้องมีผลสอบผ่าน ภาค ก ระดับปริญญาตรีขึ้นไป (ส่วน สพฐ., ท้องถิ่น, พนักงานราชการ และมหาวิทยาลัย สอบพร้อมกันได้โดยไม่ต้องใช้ผล ก.พ.)</li>' +
-                '      <li><b>รูปถ่ายหน้าตรง &amp; ไฟล์เอกสาร:</b> เตรียมไฟล์รูปถ่ายชุดสุภาพ/ชุดครุย (พื้นหลังสีน้ำเงินหรือขาวตามประกาศ) ขนาดไม่เกิน 1–2 MB สำหรับอัปโหลดเข้าระบบรับสมัครออนไลน์</li>' +
-                '    </ul>' +
-                '  </div>' +
-                '</div>';
-
-            $('#toggle-add-job-btn').onclick = function () {
-                showAddForm = !showAddForm;
-                draw();
-            };
-
-            if ($('#cj-cancel')) {
-                $('#cj-cancel').onclick = function () {
-                    showAddForm = false;
-                    draw();
-                };
-            }
-
-            if ($('#custom-job-form')) {
-                $('#custom-job-form').onsubmit = function (e) {
-                    e.preventDefault();
-                    var agency = $('#cj-agency').value.trim();
-                    if (!agency) return;
-                    var applyStr = $('#cj-schedule').value.trim();
-                    var newJob = {
-                        id: 'custom_job_' + Date.now(),
-                        cat: $('#cj-cat').value,
-                        agency: agency,
-                        title: $('#cj-title').value.trim() || 'นักวิชาการคอมพิวเตอร์',
-                        empType: $('#cj-emptype').value.trim() || 'ข้าราชการ / พนักงานราชการ',
-                        qual: 'ปริญญาตรี สาขาวิชาใดวิชาหนึ่งทางคอมพิวเตอร์',
-                        examReq: 'ตามประกาศรับสมัครของหน่วยงาน',
-                        applyDate: applyStr,
-                        schedule: applyStr,
-                        examDate: $('#cj-examdate').value || '',
-                        url: $('#cj-url').value.trim()
-                    };
-                    P.customJobs.unshift(newJob);
-                    P.jobStatus[newJob.id] = 'saved';
-                    save();
-                    renderSidebar('jobs');
-                    showAddForm = false;
-                    draw();
-                };
-            }
-
-            $('#job-search-input').oninput = function () {
-                searchQuery = this.value.trim().toLowerCase();
-                draw();
-                var inp = $('#job-search-input');
-                if (inp) {
-                    inp.focus();
-                    inp.setSelectionRange(inp.value.length, inp.value.length);
-                }
-            };
-
-            $$('[data-jcat]').forEach(function (btn) {
-                btn.onclick = function () {
-                    selectedCat = btn.dataset.jcat;
-                    draw();
-                };
-            });
-
-            $$('[data-edit-apply]').forEach(function (btn) {
-                btn.onclick = function () {
-                    var jid = btn.dataset.editApply;
-                    var target = allJobs.filter(function (x) { return x.id === jid; })[0];
-                    var currentVal = P.jobDates[jid] || (target && (target.applyDate || target.schedule)) || '';
-                    var input = prompt('ระบุวันที่เปิด–ปิดรับสมัคร (เช่น 20 พ.ย. – 4 ธ.ค. 2569):', currentVal);
-                    if (input !== null) {
-                        var trimmed = input.trim();
-                        if (trimmed) {
-                            P.jobDates[jid] = trimmed;
-                        } else {
-                            delete P.jobDates[jid];
-                        }
-                        save();
-                        draw();
-                    }
-                };
-            });
-
-            $$('[data-job-act]').forEach(function (btn) {
-                btn.onclick = function () {
-                    var jid = btn.dataset.jobId;
-                    var act = btn.dataset.jobAct;
-                    if (P.jobStatus[jid] === act) {
-                        delete P.jobStatus[jid];
-                    } else {
-                        P.jobStatus[jid] = act;
-                    }
-                    save();
-                    draw();
-                };
-            });
-
-            $$('[data-set-exam]').forEach(function (btn) {
-                btn.onclick = function () {
-                    P.examDate = btn.dataset.setExam;
-                    save();
-                    updateCountdownSidebar();
-                    alert('✅ ตั้งวันสอบเป้าหมายเป็นวันที่ ' + P.examDate + ' เรียบร้อยแล้ว');
-                };
-            });
-
-            $$('[data-del-job]').forEach(function (btn) {
-                btn.onclick = function () {
-                    var jid = btn.dataset.delJob;
-                    if (confirm('ยืนยันการลบประกาศรับสมัครรายการนี้?')) {
-                        P.customJobs = P.customJobs.filter(function (x) { return x.id !== jid; });
-                        delete P.jobStatus[jid];
-                        delete P.jobDates[jid];
-                        save();
-                        renderSidebar('jobs');
-                        draw();
-                    }
-                };
-            });
-        }
-
-        draw();
-    }
-
-    /* ----------------------------------------------------------------------
        1. Reading Lesson Page View (เฉพาะส่วนเนื้อหาอ่าน + ตาราง + Flashcards)
        ---------------------------------------------------------------------- */
     function renderLessonPage(catId, secIdx) {
@@ -1371,6 +1050,7 @@
             }
         });
 
+        // แถบควบคุมท้ายบทเรียน: บันทึกว่าอ่านจบ + ปุ่มลัดไปทำแบบทดสอบท้ายบท / ดูคลิปติว
         var isDone = !!P.completed[topicKey];
         var actionHtml =
             '<div class="card" style="text-align:center">' +
@@ -1403,6 +1083,7 @@
             };
         }
 
+        // ปุ่มก่อนหน้า / ถัดไป เฉพาะในหมวดเนื้อหาอ่าน
         var flatIdx = READING_TOPICS.findIndex(function (x) { return x.k === topicKey; });
         var prevT = flatIdx > 0 ? READING_TOPICS[flatIdx - 1] : null;
         var nextT = flatIdx < READING_TOPICS.length - 1 ? READING_TOPICS[flatIdx + 1] : null;
@@ -1469,7 +1150,7 @@
     }
 
     /* ----------------------------------------------------------------------
-       3. Chapter Quizzes & 4. Past Exams Hub
+       3. Chapter Quizzes Hub & Runner (ส่วนแบบทดสอบท้ายบท แยกจากเนื้อหา)
        ---------------------------------------------------------------------- */
     function renderQuizSetListPage(options) {
         $('#page-title').textContent = options.pageTitle;
@@ -1567,6 +1248,9 @@
         });
     }
 
+    /* ----------------------------------------------------------------------
+       4. Past Exams Hub & Question Bank / Mock Exam / Review Mistakes
+       ---------------------------------------------------------------------- */
     function renderPastExamsHub(examId) {
         if (examId) {
             var found = PAST_EXAM_SETS.filter(function (e) { return e.id === examId; })[0];
@@ -1577,8 +1261,8 @@
         }
         renderQuizSetListPage({
             pageTitle: 'ข้อสอบเก่าแยกชุด',
-            headerTitle: '📜 ส่วนคลังข้อสอบเก่า & แนวข้อสอบจริง (แยกชุดทุกหน่วยงาน)',
-            subtitle: 'เลือกทำข้อสอบเก่าแยกตามหน่วยงานและหมวดวิชา หรือกดเข้าโหมดสุ่มข้อสอบจำลอง (Mock Exam) ด้านล่าง',
+            headerTitle: '📜 ส่วนคลังข้อสอบเก่า & แนวข้อสอบจริง (แยกชุด)',
+            subtitle: 'เลือกทำข้อสอบเก่าแยกตามหมวดวิชา หรือกดเข้าโหมดสุ่มข้อสอบจำลอง (Mock Exam) ด้านล่าง',
             extraBanner:
                 '<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:12px">' +
                 '  <a href="#mock" class="btn-primary">⏱️ สุ่มทำ Mock Exam (15 ข้อ)</a>' +
@@ -1623,7 +1307,7 @@
     function renderQuestionBank() {
         renderQuizCollection(
             '📚 Question Bank (คลังข้อสอบรวมทั้งหมด)',
-            'รวบรวมข้อสอบทั้งหมด ' + ALL_QUESTIONS.length + ' ข้อจากทุกหน่วยงานและทุกหมวดวิชา',
+            'รวบรวมข้อสอบทั้งหมด ' + ALL_QUESTIONS.length + ' ข้อจากทั้งแบบทดสอบท้ายบทและคลังข้อสอบเก่า',
             ALL_QUESTIONS,
             'ยังไม่มีข้อสอบในคลัง'
         );
@@ -1633,7 +1317,7 @@
         var shuffled = ALL_QUESTIONS.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 15);
         renderQuizCollection(
             '⏱️ Mock Exam (ข้อสอบจำลองสุ่ม 15 ข้อ)',
-            'สุ่มข้อสอบคละหมวด ภาค ก · กฎหมาย · คอมพิวเตอร์ · สัมภาษณ์ (ตั้งเป้า ≥ 80%)',
+            'สุ่มข้อสอบคละหมวด ภาค ก · กฎหมายการศึกษา · คอมพิวเตอร์ · สัมภาษณ์ (ตั้งเป้า ≥ 80%)',
             shuffled,
             'ยังไม่มีข้อสอบสำหรับจำลอง'
         );
@@ -1657,7 +1341,7 @@
             '<div class="lesson-wrap">' +
             '  <div class="card">' +
             '    <h1>🗂️ Flashcards Deck (รวมบัตรคำทั้งหมด)</h1>' +
-            '    <p class="mu" style="margin:0">รวมบัตรคำท่องจำ ' + ALL_FLASHCARDS.length + ' ใบ ครอบคลุมกฎหมาย พอร์ตเครือข่าย และระบบเฉพาะทาง</p>' +
+            '    <p class="mu" style="margin:0">รวมบัตรคำท่องจำ ' + ALL_FLASHCARDS.length + ' ใบ ทั้งกฎหมายการศึกษา พอร์ตเครือข่าย และระบบปฏิบัติการ</p>' +
             '  </div>' +
             '  <div class="card" id="all-fc-host"></div>' +
             '</div>';
@@ -1714,9 +1398,9 @@
             box.value = jsonStr;
             box.select();
             if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(jsonStr).catch(function () {});
+                navigator.clipboard.writeText(jsonStr).catch(function () { });
             } else {
-                try { document.execCommand('copy'); } catch (e) {}
+                try { document.execCommand('copy'); } catch (e) { }
             }
             $('#bk-msg').textContent = '✅ คัดลอกข้อมูลสำรองเรียบร้อยแล้ว';
         };
@@ -1757,8 +1441,6 @@
 
         if (hash === 'home') {
             renderDashboard();
-        } else if (hash === 'jobs') {
-            renderJobsPage();
         } else if (hash === 'videos') {
             renderVideosPage();
         } else if (hash === 'quizzes') {
@@ -1812,9 +1494,6 @@
             route();
             return;
         }
-        var jobMatches = getAllJobs().filter(function (j) {
-            return j.agency.toLowerCase().indexOf(q) >= 0 || j.title.toLowerCase().indexOf(q) >= 0 || j.cat.toLowerCase().indexOf(q) >= 0;
-        });
         var topicMatches = READING_TOPICS.filter(function (t) {
             return t.t.toLowerCase().indexOf(q) >= 0 || t.catTitle.toLowerCase().indexOf(q) >= 0;
         });
@@ -1826,10 +1505,6 @@
         });
 
         var resHtml = '';
-        if (jobMatches.length) {
-            resHtml += '<div class="sb-group-title">📢 ประกาศรับสมัคร (' + jobMatches.length + ')</div>' +
-                jobMatches.map(function (j) { return navLink('#jobs', '📢', j.cat + ' · ' + j.agency, false); }).join('');
-        }
         if (topicMatches.length) {
             resHtml += '<div class="sb-group-title">📖 เนื้อหาอ่าน (' + topicMatches.length + ')</div>' +
                 topicMatches.map(function (m) { return navLink('#' + m.k, '📄', m.t, false); }).join('');
@@ -1876,6 +1551,7 @@
         }, 60);
     };
 
+    // User Account Dropdown
     $('#user-menu-btn').onclick = function (e) {
         e.stopPropagation();
         var dd = $('#user-dropdown');
@@ -1894,11 +1570,12 @@
     };
 
     $('#ud-logout').onclick = function () {
-        try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+        try { localStorage.removeItem(SESSION_KEY); } catch (e) { }
         currentUser = null;
         openAuthScreen();
     };
 
+    // Exam Date Modal
     function openDateModal() {
         $('#user-dropdown').hidden = true;
         $('#exam-date-input').value = (P && P.examDate) ? P.examDate : '';
