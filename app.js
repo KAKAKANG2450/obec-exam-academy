@@ -109,7 +109,10 @@
     }
 
     function buildDataIndex() {
-        DATA_CATS = (typeof D !== 'undefined' && Array.isArray(D)) ? D : [];
+        var rawD = (typeof D !== 'undefined' && Array.isArray(D) && D.length > 0)
+            ? D
+            : (Array.isArray(window.D) ? window.D : []);
+        DATA_CATS = rawD;
         READING_TOPICS = [];
         ALL_VIDEOS = [];
         CHAPTER_QUIZZES = [];
