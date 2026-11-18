@@ -1033,6 +1033,10 @@
         var searchQuery = '';
         var showAddForm = false;
 
+        if (!P.jobDates || typeof P.jobDates !== 'object') {
+            P.jobDates = {};
+        }
+
         var portals = Array.isArray(window.JOB_PORTALS) ? window.JOB_PORTALS : [];
 
         function draw() {
@@ -1041,13 +1045,14 @@
 
             var filteredJobs = allJobs.filter(function (j) {
                 var st = P.jobStatus[j.id] || '';
+                var curApplyDate = P.jobDates[j.id] || j.applyDate || j.schedule || '';
                 if (selectedCat === 'tracked') {
                     if (!st) return false;
                 } else if (selectedCat !== 'all') {
                     if (j.cat !== selectedCat) return false;
                 }
                 if (searchQuery) {
-                    var hay = (j.agency + ' ' + j.title + ' ' + j.cat + ' ' + j.empType + ' ' + (j.schedule || '')).toLowerCase();
+                    var hay = (j.agency + ' ' + j.title + ' ' + j.cat + ' ' + j.empType + ' ' + curApplyDate).toLowerCase();
                     if (hay.indexOf(searchQuery) < 0) return false;
                 }
                 return true;
@@ -1055,14 +1060,11 @@
 
             var trackedCount = allJobs.filter(function (j) { return !!P.jobStatus[j.id]; }).length;
 
-            // 1. Official Portals Grid
             var portalsHtml = portals.map(function (p) {
                 return (
                     '<div class="card" style="border-left:4px solid ' + esc(p.color) + ';display:flex;flex-direction:column;justify-content:space-between;gap:10px">' +
                     '  <div>' +
-                    '    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">' +
-                    '      <span style="font-size:0.78em;font-weight:700;padding:2px 8px;border-radius:999px;background:' + esc(p.color) + '18;color:' + esc(p.color) + '">' + esc(p.tag) + '</span>' +
-                    '    </div>' +
+                    '    <span style="font-size:0.78em;font-weight:700;padding:2px 8px;border-radius:999px;background:' + esc(p.color) + '18;color:' + esc(p.color) + '">' + esc(p.tag) + '</span>' +
                     '    <div style="font-weight:700;font-size:1.02em;margin:6px 0 4px">' + esc(p.agency) + '</div>' +
                     '    <p class="mu" style="font-size:0.88em;margin:0 0 6px">' + esc(p.desc) + '</p>' +
                     '    <div style="font-size:0.82em;color:var(--ok)">💡 ' + esc(p.searchTip) + '</div>' +
@@ -1074,7 +1076,6 @@
                 );
             }).join('');
 
-            // 2. Filter Tabs
             var filterBtns =
                 '<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:12px">' +
                 '<button type="button" class="' + (selectedCat === 'all' ? 'btn-primary' : 'btn-outline') + '" data-jcat="all">ทั้งหมด (' + allJobs.length + ')</button>' +
@@ -1084,63 +1085,65 @@
                 }).join('') +
                 '</div>';
 
-            // 3. Add Custom Job Form
             var addFormHtml = showAddForm
                 ? '<div class="card" style="border:2px dashed var(--pr);background:var(--bg)">' +
-                '  <h3 style="margin-top:0">➕ เพิ่มประกาศรับสมัครงานที่ต้องการติดตาม</h3>' +
-                '  <p class="mu" style="font-size:0.88em">บันทึกประกาศรับสมัครจริงที่คุณพบ (เช่น สพป.จังหวัด, โรงพยาบาล, เทศบาล, กรมต่าง ๆ) เพื่อเก็บลิงก์และแจ้งเตือนวันสอบ</p>' +
-                '  <form id="custom-job-form">' +
-                '    <div class="form-group">' +
-                '      <label>ชื่อหน่วยงาน / จังหวัด <span class="req">*</span></label>' +
-                '      <input type="text" id="cj-agency" placeholder="เช่น สำนักงานเขตพื้นที่การศึกษาประถมศึกษาสุราษฎร์ธานี เขต 1" required>' +
-                '    </div>' +
-                '    <div class="row" style="gap:10px;flex-wrap:wrap">' +
-                '      <div class="form-group" style="flex:1;min-width:200px">' +
-                '        <label>สังกัด / หมวดหมู่</label>' +
-                '        <select id="cj-cat" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx)">' +
-                categories.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('') +
-                '        </select>' +
-                '      </div>' +
-                '      <div class="form-group" style="flex:1;min-width:200px">' +
-                '        <label>ประเภทการจ้าง</label>' +
-                '        <input type="text" id="cj-emptype" value="ข้าราชการ / พนักงานราชการ">' +
-                '      </div>' +
-                '    </div>' +
-                '    <div class="form-group">' +
-                '      <label>ชื่อตำแหน่ง &amp; รายละเอียดเพิ่มเติม</label>' +
-                '      <input type="text" id="cj-title" value="นักวิชาการคอมพิวเตอร์ (จำนวน 1 อัตรา)">' +
-                '    </div>' +
-                '    <div class="row" style="gap:10px;flex-wrap:wrap">' +
-                '      <div class="form-group" style="flex:1;min-width:200px">' +
-                '        <label>ช่วงวันรับสมัคร / วันสอบ</label>' +
-                '        <input type="text" id="cj-schedule" placeholder="เช่น รับสมัคร 1–15 ธ.ค. 2569">' +
-                '      </div>' +
-                '      <div class="form-group" style="flex:1;min-width:200px">' +
-                '        <label>วันสอบข้อเขียน (ถ้าทราบ — ใช้ตั้งนับถอยหลังได้)</label>' +
-                '        <input type="date" id="cj-examdate">' +
-                '      </div>' +
-                '    </div>' +
-                '    <div class="form-group">' +
-                '      <label>ลิงก์ประกาศรับสมัคร (URL หรือ PDF)</label>' +
-                '      <input type="url" id="cj-url" placeholder="https://...">' +
-                '    </div>' +
-                '    <div class="row end" style="gap:8px">' +
-                '      <button type="button" id="cj-cancel" class="btn-outline">ยกเลิก</button>' +
-                '      <button type="submit" class="btn-primary">💾 บันทึกประกาศรับสมัคร</button>' +
-                '    </div>' +
-                '  </form>' +
-                '</div>'
+                  '  <h3 style="margin-top:0">➕ เพิ่มประกาศรับสมัครงานที่ต้องการติดตาม</h3>' +
+                  '  <p class="mu" style="font-size:0.88em">บันทึกประกาศรับสมัครจริงที่คุณพบ (เช่น สพป.จังหวัด, โรงพยาบาล, เทศบาล, กรมต่าง ๆ) พร้อมระบุวันที่รับสมัคร</p>' +
+                  '  <form id="custom-job-form">' +
+                  '    <div class="form-group">' +
+                  '      <label>ชื่อหน่วยงาน / จังหวัด <span class="req">*</span></label>' +
+                  '      <input type="text" id="cj-agency" placeholder="เช่น สำนักงานเขตพื้นที่การศึกษาประถมศึกษาสุราษฎร์ธานี เขต 1" required>' +
+                  '    </div>' +
+                  '    <div class="row" style="gap:10px;flex-wrap:wrap">' +
+                  '      <div class="form-group" style="flex:1;min-width:200px">' +
+                  '        <label>สังกัด / หมวดหมู่</label>' +
+                  '        <select id="cj-cat" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx)">' +
+                  categories.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('') +
+                  '        </select>' +
+                  '      </div>' +
+                  '      <div class="form-group" style="flex:1;min-width:200px">' +
+                  '        <label>ประเภทการจ้าง</label>' +
+                  '        <input type="text" id="cj-emptype" value="ข้าราชการ / พนักงานราชการ">' +
+                  '      </div>' +
+                  '    </div>' +
+                  '    <div class="form-group">' +
+                  '      <label>ชื่อตำแหน่ง &amp; รายละเอียดเพิ่มเติม</label>' +
+                  '      <input type="text" id="cj-title" value="นักวิชาการคอมพิวเตอร์ (จำนวน 1 อัตรา)">' +
+                  '    </div>' +
+                  '    <div class="row" style="gap:10px;flex-wrap:wrap">' +
+                  '      <div class="form-group" style="flex:1;min-width:200px">' +
+                  '        <label>📅 วันที่เปิด–ปิดรับสมัคร <span class="req">*</span></label>' +
+                  '        <input type="text" id="cj-schedule" placeholder="เช่น 20 พ.ย. – 4 ธ.ค. 2569" required>' +
+                  '      </div>' +
+                  '      <div class="form-group" style="flex:1;min-width:200px">' +
+                  '        <label>วันสอบข้อเขียน (ถ้าทราบ — ใช้ตั้งนับถอยหลังได้)</label>' +
+                  '        <input type="date" id="cj-examdate">' +
+                  '      </div>' +
+                  '    </div>' +
+                  '    <div class="form-group">' +
+                  '      <label>ลิงก์ประกาศรับสมัคร (URL หรือ PDF)</label>' +
+                  '      <input type="url" id="cj-url" placeholder="https://...">' +
+                  '    </div>' +
+                  '    <div class="row end" style="gap:8px">' +
+                  '      <button type="button" id="cj-cancel" class="btn-outline">ยกเลิก</button>' +
+                  '      <button type="submit" class="btn-primary">💾 บันทึกประกาศรับสมัคร</button>' +
+                  '    </div>' +
+                  '  </form>' +
+                  '</div>'
                 : '';
 
-            // 4. Job Cards List
             var jobsListHtml = filteredJobs.map(function (j) {
                 var st = P.jobStatus[j.id] || '';
                 var isCustom = String(j.id).indexOf('custom_job_') === 0;
+                var displayApplyDate = P.jobDates[j.id] || j.applyDate || j.schedule || 'ระบุวันที่รับสมัครได้ด้วยปุ่มด้านล่าง';
                 var statusPill = '';
+
                 if (st === 'applied') {
                     statusPill = '<span style="font-size:0.8em;font-weight:700;padding:3px 10px;border-radius:999px;background:#dcfce7;color:#15803d">✅ สมัครแล้ว</span>';
                 } else if (st === 'saved') {
                     statusPill = '<span style="font-size:0.8em;font-weight:700;padding:3px 10px;border-radius:999px;background:#dbeafe;color:#1d4ed8">🔖 กำลังติดตาม</span>';
+                } else if (j.statusText) {
+                    statusPill = '<span style="font-size:0.8em;font-weight:700;padding:3px 10px;border-radius:999px;background:#fef3c7;color:#b45309">📣 ' + esc(j.statusText) + '</span>';
                 }
 
                 return (
@@ -1154,13 +1157,16 @@
                     '    </div>' +
                     '    <div>' + statusPill + '</div>' +
                     '  </div>' +
+                    '  <div style="padding:10px 12px;margin-bottom:10px;border-radius:10px;background:var(--bg);border-left:4px solid var(--pr);font-size:0.92em">' +
+                    '    <b>📅 วันที่รับสมัคร:</b> <span style="color:var(--pr);font-weight:700">' + esc(displayApplyDate) + '</span>' +
+                    '  </div>' +
                     '  <div style="font-size:0.9em;line-height:1.6;margin-bottom:12px">' +
                     (j.qual ? '    <div><b>🎓 คุณวุฒิ:</b> ' + esc(j.qual) + '</div>' : '') +
                     (j.examReq ? '    <div><b>📝 เงื่อนไขการสอบ:</b> ' + esc(j.examReq) + '</div>' : '') +
-                    '    <div><b>📅 กำหนดการ:</b> ' + esc(j.schedule || 'ติดตามตามประกาศหน่วยงาน') + '</div>' +
                     '  </div>' +
                     '  <div class="row" style="gap:8px;flex-wrap:wrap">' +
                     (j.url ? '<a href="' + esc(safeUrl(j.url)) + '" target="_blank" rel="noopener noreferrer" class="btn-primary">🔗 ดูประกาศ / สมัครสอบ ↗</a>' : '') +
+                    '    <button type="button" class="btn-outline" data-edit-apply="' + esc(j.id) + '">✏️ อัปเดตวันที่รับสมัคร</button>' +
                     '    <button type="button" class="' + (st === 'saved' ? 'btn-primary' : 'btn-outline') + '" data-job-act="saved" data-job-id="' + esc(j.id) + '">🔖 บันทึกติดตาม</button>' +
                     '    <button type="button" class="' + (st === 'applied' ? 'btn-primary' : 'btn-outline') + '" data-job-act="applied" data-job-id="' + esc(j.id) + '">✅ สมัครแล้ว</button>' +
                     (j.examDate ? '<button type="button" class="btn-outline" data-set-exam="' + esc(j.examDate) + '">📅 ตั้งวันสอบ (' + esc(j.examDate) + ')</button>' : '') +
@@ -1176,7 +1182,7 @@
                 '    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">' +
                 '      <div>' +
                 '        <h1>📢 ประกาศรับตำแหน่งนักวิชาการคอมพิวเตอร์ ทุกหน่วยงาน</h1>' +
-                '        <p class="mu" style="margin:0">รวมช่องทางสมัครงานราชการ-รัฐวิสาหกิจอย่างเป็นทางการ พร้อมระบบบันทึกติดตามการสมัครของคุณ</p>' +
+                '        <p class="mu" style="margin:0">รวมช่องทางสมัครงานราชการ-รัฐวิสาหกิจอย่างเป็นทางการ พร้อมระบบบันทึกวันที่รับสมัครและติดตามสถานะ</p>' +
                 '      </div>' +
                 '      <button type="button" id="toggle-add-job-btn" class="btn-primary">' + (showAddForm ? '✕ ปิดฟอร์ม' : '➕ เพิ่มประกาศรับสมัครเอง') + '</button>' +
                 '    </div>' +
@@ -1189,7 +1195,7 @@
 
                 '  <div class="section-heading" style="margin-top:24px">2. รายการตำแหน่งเปิดรับสมัคร &amp; บันทึกติดตามของฉัน</div>' +
                 '  <div class="card">' +
-                '    <input type="search" id="job-search-input" class="sb-search" value="' + esc(searchQuery) + '" placeholder="🔍 ค้นหาชื่อหน่วยงาน, จังหวัด, ข้าราชการ, พนักงานราชการ...">' +
+                '    <input type="search" id="job-search-input" class="sb-search" value="' + esc(searchQuery) + '" placeholder="🔍 ค้นหาชื่อหน่วยงาน, จังหวัด, วันที่รับสมัคร, ข้าราชการ...">' +
                 filterBtns +
                 '  </div>' +
                 (jobsListHtml || '<div class="card"><p class="mu" style="text-align:center;padding:18px 0">ไม่พบรายการประกาศรับสมัครที่ตรงกับเงื่อนไข</p></div>') +
@@ -1205,7 +1211,6 @@
                 '  </div>' +
                 '</div>';
 
-            // Event bindings
             $('#toggle-add-job-btn').onclick = function () {
                 showAddForm = !showAddForm;
                 draw();
@@ -1223,6 +1228,7 @@
                     e.preventDefault();
                     var agency = $('#cj-agency').value.trim();
                     if (!agency) return;
+                    var applyStr = $('#cj-schedule').value.trim();
                     var newJob = {
                         id: 'custom_job_' + Date.now(),
                         cat: $('#cj-cat').value,
@@ -1231,7 +1237,8 @@
                         empType: $('#cj-emptype').value.trim() || 'ข้าราชการ / พนักงานราชการ',
                         qual: 'ปริญญาตรี สาขาวิชาใดวิชาหนึ่งทางคอมพิวเตอร์',
                         examReq: 'ตามประกาศรับสมัครของหน่วยงาน',
-                        schedule: $('#cj-schedule').value.trim() || 'ตามประกาศรับสมัคร',
+                        applyDate: applyStr,
+                        schedule: applyStr,
                         examDate: $('#cj-examdate').value || '',
                         url: $('#cj-url').value.trim()
                     };
@@ -1258,6 +1265,25 @@
                 btn.onclick = function () {
                     selectedCat = btn.dataset.jcat;
                     draw();
+                };
+            });
+
+            $$('[data-edit-apply]').forEach(function (btn) {
+                btn.onclick = function () {
+                    var jid = btn.dataset.editApply;
+                    var target = allJobs.filter(function (x) { return x.id === jid; })[0];
+                    var currentVal = P.jobDates[jid] || (target && (target.applyDate || target.schedule)) || '';
+                    var input = prompt('ระบุวันที่เปิด–ปิดรับสมัคร (เช่น 20 พ.ย. – 4 ธ.ค. 2569):', currentVal);
+                    if (input !== null) {
+                        var trimmed = input.trim();
+                        if (trimmed) {
+                            P.jobDates[jid] = trimmed;
+                        } else {
+                            delete P.jobDates[jid];
+                        }
+                        save();
+                        draw();
+                    }
                 };
             });
 
@@ -1290,6 +1316,7 @@
                     if (confirm('ยืนยันการลบประกาศรับสมัครรายการนี้?')) {
                         P.customJobs = P.customJobs.filter(function (x) { return x.id !== jid; });
                         delete P.jobStatus[jid];
+                        delete P.jobDates[jid];
                         save();
                         renderSidebar('jobs');
                         draw();
