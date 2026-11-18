@@ -73,7 +73,7 @@
         d: { color: '#ea580c', icon: 'ค', short: 'ภาค ค' }
     };
 
-    var DATA_CATS = (typeof D !== 'undefined' && Array.isArray(D)) ? D : [];
+    var DATA_CATS = [];
     var READING_TOPICS = [];
     var ALL_VIDEOS = [];
     var CHAPTER_QUIZZES = [];
@@ -108,93 +108,103 @@
         return tmp.innerHTML.trim();
     }
 
-    DATA_CATS.forEach(function (cat) {
-        (cat.s || []).forEach(function (sec, idx) {
-            var key = cat.id + '/' + idx;
-            var pastQuizBlk = null;
+    function buildDataIndex() {
+        DATA_CATS = (typeof D !== 'undefined' && Array.isArray(D)) ? D : [];
+        READING_TOPICS = [];
+        ALL_VIDEOS = [];
+        CHAPTER_QUIZZES = [];
+        PAST_EXAM_SETS = [];
+        ALL_QUESTIONS = [];
+        ALL_FLASHCARDS = [];
 
-            (sec.b || []).forEach(function (blk) {
-                if (blk.k === 'quiz' && String(blk.id || '').indexOf('past_') === 0) {
-                    pastQuizBlk = blk;
-                }
-            });
-
-            if (pastQuizBlk) {
-                PAST_EXAM_SETS.push({
-                    id: pastQuizBlk.id,
-                    catId: cat.id,
-                    catTitle: cat.t,
-                    title: sec.t,
-                    blk: pastQuizBlk
-                });
-            } else {
-                var cleanBlocks = [];
-                var chapterQuizBlk = null;
+        DATA_CATS.forEach(function (cat) {
+            (cat.s || []).forEach(function (sec, idx) {
+                var key = cat.id + '/' + idx;
+                var pastQuizBlk = null;
 
                 (sec.b || []).forEach(function (blk) {
-                    if (blk.k === 'h') {
-                        var cleanedHtml = extractVideosFromHtml(blk.v, cat, sec);
-                        if (cleanedHtml) {
-                            cleanBlocks.push({ k: 'h', v: cleanedHtml });
-                        }
-                    } else if (blk.k === 'quiz') {
-                        chapterQuizBlk = blk;
-                        CHAPTER_QUIZZES.push({
-                            id: blk.id,
-                            catId: cat.id,
-                            catTitle: cat.t,
-                            topicKey: key,
-                            topicTitle: sec.t,
-                            blk: blk
-                        });
-                    } else {
-                        cleanBlocks.push(blk);
+                    if (blk.k === 'quiz' && String(blk.id || '').indexOf('past_') === 0) {
+                        pastQuizBlk = blk;
                     }
                 });
 
-                READING_TOPICS.push({
-                    k: key,
-                    c: cat.id,
-                    catTitle: cat.t,
-                    t: sec.t,
-                    idx: idx,
-                    cleanBlocks: cleanBlocks,
-                    quizBlk: chapterQuizBlk
-                });
-            }
+                if (pastQuizBlk) {
+                    PAST_EXAM_SETS.push({
+                        id: pastQuizBlk.id,
+                        catId: cat.id,
+                        catTitle: cat.t,
+                        title: sec.t,
+                        blk: pastQuizBlk
+                    });
+                } else {
+                    var cleanBlocks = [];
+                    var chapterQuizBlk = null;
 
-            (sec.b || []).forEach(function (blk) {
-                if (blk.k === 'quiz' && Array.isArray(blk.qs)) {
-                    blk.qs.forEach(function (q, qIdx) {
-                        ALL_QUESTIONS.push({
-                            uid: blk.id + '_' + qIdx,
-                            quizId: blk.id,
-                            catId: cat.id,
-                            topicKey: key,
-                            topicTitle: sec.t,
-                            q: q[0],
-                            opts: q[1],
-                            ans: q[2],
-                            exp: q[3]
-                        });
+                    (sec.b || []).forEach(function (blk) {
+                        if (blk.k === 'h') {
+                            var cleanedHtml = extractVideosFromHtml(blk.v, cat, sec);
+                            if (cleanedHtml) {
+                                cleanBlocks.push({ k: 'h', v: cleanedHtml });
+                            }
+                        } else if (blk.k === 'quiz') {
+                            chapterQuizBlk = blk;
+                            CHAPTER_QUIZZES.push({
+                                id: blk.id,
+                                catId: cat.id,
+                                catTitle: cat.t,
+                                topicKey: key,
+                                topicTitle: sec.t,
+                                blk: blk
+                            });
+                        } else {
+                            cleanBlocks.push(blk);
+                        }
+                    });
+
+                    READING_TOPICS.push({
+                        k: key,
+                        c: cat.id,
+                        catTitle: cat.t,
+                        t: sec.t,
+                        idx: idx,
+                        cleanBlocks: cleanBlocks,
+                        quizBlk: chapterQuizBlk
                     });
                 }
-                if (blk.k === 'fc' && Array.isArray(blk.c)) {
-                    blk.c.forEach(function (card, cIdx) {
-                        ALL_FLASHCARDS.push({
-                            uid: blk.id + '_' + cIdx,
-                            fcId: blk.id,
-                            cardIdx: cIdx,
-                            catId: cat.id,
-                            topicTitle: sec.t,
-                            front: card[0],
-                            back: card[1]
+
+                (sec.b || []).forEach(function (blk) {
+                    if (blk.k === 'quiz' && Array.isArray(blk.qs)) {
+                        blk.qs.forEach(function (q, qIdx) {
+                            ALL_QUESTIONS.push({
+                                uid: blk.id + '_' + qIdx,
+                                quizId: blk.id,
+                                catId: cat.id,
+                                topicKey: key,
+                                topicTitle: sec.t,
+                                q: q[0],
+                                opts: q[1],
+                                ans: q[2],
+                                exp: q[3]
+                            });
                         });
-                    });
-                }
+                    }
+                    if (blk.k === 'fc' && Array.isArray(blk.c)) {
+                        blk.c.forEach(function (card, cIdx) {
+                            ALL_FLASHCARDS.push({
+                                uid: blk.id + '_' + cIdx,
+                                fcId: blk.id,
+                                cardIdx: cIdx,
+                                catId: cat.id,
+                                topicTitle: sec.t,
+                                front: card[0],
+                                back: card[1]
+                            });
+                        });
+                    }
+                });
             });
         });
-    });
+    }
 
     function getAllJobs() {
         var base = Array.isArray(window.DEFAULT_JOBS) ? window.DEFAULT_JOBS : [];
@@ -432,84 +442,86 @@
         renderSavedAccounts();
     }
 
-    $$('.auth-tab').forEach(function (tab) {
-        tab.onclick = function () { setAuthMode(tab.dataset.authMode); };
-    });
+    function bindAuthEvents() {
+        $$('.auth-tab').forEach(function (tab) {
+            tab.onclick = function () { setAuthMode(tab.dataset.authMode); };
+        });
 
-    if ($('#toggle-pass')) {
-        $('#toggle-pass').onclick = function () {
-            var inp = $('#auth-pass');
-            inp.type = (inp.type === 'password') ? 'text' : 'password';
-        };
-    }
+        if ($('#toggle-pass')) {
+            $('#toggle-pass').onclick = function () {
+                var inp = $('#auth-pass');
+                inp.type = (inp.type === 'password') ? 'text' : 'password';
+            };
+        }
 
-    if ($('#auth-form')) {
-        $('#auth-form').onsubmit = function (e) {
-            e.preventDefault();
-            var email = $('#auth-email').value.trim().toLowerCase();
-            var pass = $('#auth-pass').value;
-            var nameInput = $('#auth-name').value.trim();
+        if ($('#auth-form')) {
+            $('#auth-form').onsubmit = function (e) {
+                e.preventDefault();
+                var email = $('#auth-email').value.trim().toLowerCase();
+                var pass = $('#auth-pass').value;
+                var nameInput = $('#auth-name').value.trim();
 
-            var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-            if (!emailRegex.test(email)) {
-                showAuthError('กรุณากรอกรูปแบบ Email ให้ถูกต้อง (เช่น name@example.com)');
-                $('#auth-email').focus();
-                return;
-            }
-            if (!pass || pass.length < 4) {
-                showAuthError('กรุณากรอกรหัสผ่านอย่างน้อย 4 ตัวอักษร');
-                $('#auth-pass').focus();
-                return;
-            }
-
-            var users = store.get(USERS_KEY, {});
-            var hashed = hashSecret(email + ':' + pass);
-
-            if (authMode === 'register') {
-                if (users[email]) {
-                    showAuthError('อีเมลนี้มีบัญชีอยู่แล้ว กรุณากดแท็บ "เข้าสู่ระบบ"');
+                var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+                if (!emailRegex.test(email)) {
+                    showAuthError('กรุณากรอกรูปแบบ Email ให้ถูกต้อง (เช่น name@example.com)');
+                    $('#auth-email').focus();
                     return;
                 }
-                var newUser = {
-                    email: email,
-                    name: nameInput || email.split('@')[0],
-                    passHash: hashed,
-                    createdAt: Date.now()
-                };
-                users[email] = newUser;
-                store.set(USERS_KEY, users);
-                loadUserSession(newUser);
-            } else {
-                var existing = users[email];
-                if (!existing) {
-                    showAuthError('ไม่พบบัญชีอีเมลนี้ กรุณากดแท็บ "สมัครสมาชิกใหม่" เพื่อสร้างบัญชี');
-                    return;
-                }
-                if (existing.passHash !== hashed) {
-                    showAuthError('รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
+                if (!pass || pass.length < 4) {
+                    showAuthError('กรุณากรอกรหัสผ่านอย่างน้อย 4 ตัวอักษร');
                     $('#auth-pass').focus();
                     return;
                 }
-                loadUserSession(existing);
-            }
-        };
-    }
 
-    if ($('#demo-login-btn')) {
-        $('#demo-login-btn').onclick = function () {
-            var users = store.get(USERS_KEY, {});
-            var demoEmail = 'demo@obec-academy.th';
-            if (!users[demoEmail]) {
-                users[demoEmail] = {
-                    email: demoEmail,
-                    name: 'ผู้เข้าสอบ สพฐ. (Demo)',
-                    passHash: hashSecret(demoEmail + ':demo'),
-                    createdAt: Date.now()
-                };
-                store.set(USERS_KEY, users);
-            }
-            loadUserSession(users[demoEmail]);
-        };
+                var users = store.get(USERS_KEY, {});
+                var hashed = hashSecret(email + ':' + pass);
+
+                if (authMode === 'register') {
+                    if (users[email]) {
+                        showAuthError('อีเมลนี้มีบัญชีอยู่แล้ว กรุณากดแท็บ "เข้าสู่ระบบ"');
+                        return;
+                    }
+                    var newUser = {
+                        email: email,
+                        name: nameInput || email.split('@')[0],
+                        passHash: hashed,
+                        createdAt: Date.now()
+                    };
+                    users[email] = newUser;
+                    store.set(USERS_KEY, users);
+                    loadUserSession(newUser);
+                } else {
+                    var existing = users[email];
+                    if (!existing) {
+                        showAuthError('ไม่พบบัญชีอีเมลนี้ กรุณากดแท็บ "สมัครสมาชิกใหม่" เพื่อสร้างบัญชี');
+                        return;
+                    }
+                    if (existing.passHash !== hashed) {
+                        showAuthError('รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
+                        $('#auth-pass').focus();
+                        return;
+                    }
+                    loadUserSession(existing);
+                }
+            };
+        }
+
+        if ($('#demo-login-btn')) {
+            $('#demo-login-btn').onclick = function () {
+                var users = store.get(USERS_KEY, {});
+                var demoEmail = 'demo@obec-academy.th';
+                if (!users[demoEmail]) {
+                    users[demoEmail] = {
+                        email: demoEmail,
+                        name: 'ผู้เข้าสอบ สพฐ. (Demo)',
+                        passHash: hashSecret(demoEmail + ':demo'),
+                        createdAt: Date.now()
+                    };
+                    store.set(USERS_KEY, users);
+                }
+                loadUserSession(users[demoEmail]);
+            };
+        }
     }
 
     /* ----------------------------------------------------------------------
@@ -822,6 +834,13 @@
         var nextTopic = READING_TOPICS.filter(function (t) { return !P.completed[t.k]; })[0] || READING_TOPICS[0] || { k: 'home', c: 'a', catTitle: 'ภาค ก', t: 'เริ่มเตรียมสอบ' };
         var nextCatCode = (CAT_META[nextTopic.c] && CAT_META[nextTopic.c].short) || '';
 
+        var missingDataAlert = DATA_CATS.length === 0
+            ? '<div class="card" style="border-left:4px solid var(--rose);background:#fef2f2">' +
+              '  <h3 style="margin-top:0;color:#b91c1c">⚠️ ยังไม่พบไฟล์เนื้อหาและข้อสอบ (data.js)</h3>' +
+              '  <p style="margin-bottom:0">กรุณาเปิดไฟล์ <code>index.html</code> แล้วตรวจสอบว่ามีแท็ก <code>&lt;script src="data.js"&gt;&lt;/script&gt;</code> อยู่เหนือ <code>&lt;script src="app.js"&gt;&lt;/script&gt;</code> จากนั้นกด <b>Ctrl + Shift + R</b></p>' +
+              '</div>'
+            : '';
+
         var cd = getCountdownInfo();
         var countdownHtml = cd
             ? '<div class="countdown-num">' + (cd.days >= 0 ? cd.days : 0) + '</div>' +
@@ -900,6 +919,7 @@
         $('#main').innerHTML =
             '<div class="dash-layout">' +
             '  <div class="dash-main">' +
+            missingDataAlert +
             '    <div class="card hero-card">' +
             '      ' + heroSvg +
             '      <div class="hero-body">' +
@@ -1750,7 +1770,7 @@
     }
 
     /* ----------------------------------------------------------------------
-       Router (With Safe Error Boundary)
+       Router
        ---------------------------------------------------------------------- */
     function route() {
         if (!currentUser) return;
@@ -1799,7 +1819,6 @@
                     '<div class="lesson-wrap"><div class="card" style="border-left:4px solid var(--rose)">' +
                     '<h3>⚠️ พบข้อผิดพลาดในการแสดงผลหน้าเว็บ</h3>' +
                     '<p>สาเหตุ: <code>' + esc(err && err.message ? err.message : String(err)) + '</code></p>' +
-                    '<p class="mu">กรุณาตรวจสอบว่าไฟล์ <code>data.js</code>, <code>jobs_board.js</code> และ <code>app.js</code> อยู่ในโฟลเดอร์เดียวกันและไม่มีอักขระตกหล่น</p>' +
                     '</div></div>';
             }
         }
@@ -1818,155 +1837,160 @@
         if ($('#backdrop')) $('#backdrop').classList.remove('show');
     }
 
-    if ($('#menu')) $('#menu').onclick = openMobileDrawer;
-    if ($('#sb-close')) $('#sb-close').onclick = closeMobileDrawer;
-    if ($('#backdrop')) $('#backdrop').onclick = closeMobileDrawer;
-
-    if ($('#sq')) {
-        $('#sq').oninput = function () {
-            var q = this.value.trim().toLowerCase();
-            if (!q) {
-                route();
-                return;
-            }
-            var jobMatches = getAllJobs().filter(function (j) {
-                return j.agency.toLowerCase().indexOf(q) >= 0 || j.title.toLowerCase().indexOf(q) >= 0 || j.cat.toLowerCase().indexOf(q) >= 0;
-            });
-            var topicMatches = READING_TOPICS.filter(function (t) {
-                return t.t.toLowerCase().indexOf(q) >= 0 || t.catTitle.toLowerCase().indexOf(q) >= 0;
-            });
-            var videoMatches = ALL_VIDEOS.filter(function (v) {
-                return v.title.toLowerCase().indexOf(q) >= 0 || v.catTitle.toLowerCase().indexOf(q) >= 0;
-            });
-            var examMatches = PAST_EXAM_SETS.filter(function (e) {
-                return e.title.toLowerCase().indexOf(q) >= 0 || e.catTitle.toLowerCase().indexOf(q) >= 0;
-            });
-
-            var resHtml = '';
-            if (jobMatches.length) {
-                resHtml += '<div class="sb-group-title">📢 ประกาศรับสมัคร (' + jobMatches.length + ')</div>' +
-                    jobMatches.map(function (j) { return navLink('#jobs', '📢', j.cat + ' · ' + j.agency, false); }).join('');
-            }
-            if (topicMatches.length) {
-                resHtml += '<div class="sb-group-title">📖 เนื้อหาอ่าน (' + topicMatches.length + ')</div>' +
-                    topicMatches.map(function (m) { return navLink('#' + m.k, '📄', m.t, false); }).join('');
-            }
-            if (videoMatches.length) {
-                resHtml += '<div class="sb-group-title">🎬 คลิปติว (' + videoMatches.length + ')</div>' +
-                    videoMatches.map(function (v) { return navLink('#videos', '🎬', v.title, false); }).join('');
-            }
-            if (examMatches.length) {
-                resHtml += '<div class="sb-group-title">📜 ข้อสอบเก่า (' + examMatches.length + ')</div>' +
-                    examMatches.map(function (e) { return navLink('#past-exams/' + e.id, '📜', e.title, false); }).join('');
-            }
-
-            if ($('#nav')) $('#nav').innerHTML = resHtml || '<div class="mu" style="padding:10px">ไม่พบหัวข้อที่ค้นหา</div>';
-        };
-    }
-
-    if ($('#fa')) {
-        $('#fa').onclick = function () {
-            P.fs = Math.max(13, (P.fs || 16) - 1);
-            applyPreferences();
-            save();
-        };
-    }
-
-    if ($('#fb')) {
-        $('#fb').onclick = function () {
-            P.fs = Math.min(24, (P.fs || 16) + 1);
-            applyPreferences();
-            save();
-        };
-    }
-
-    if ($('#th')) {
-        $('#th').onclick = function () {
-            var isDark = document.documentElement.dataset.theme === 'dark' ||
-                (!document.documentElement.dataset.theme && window.matchMedia('(prefers-color-scheme: dark)').matches);
-            P.theme = isDark ? 'light' : 'dark';
-            applyPreferences();
-            save();
-        };
-    }
-
-    if ($('#hdr-check')) {
-        $('#hdr-check').onclick = function () {
-            if (location.hash !== '#home') {
-                location.hash = '#home';
-            }
-            setTimeout(function () {
-                var el = $('#daily-quests-card');
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 60);
-        };
-    }
-
-    if ($('#user-menu-btn')) {
-        $('#user-menu-btn').onclick = function (e) {
-            e.stopPropagation();
-            var dd = $('#user-dropdown');
-            if (dd) dd.hidden = !dd.hidden;
-        };
-    }
-
-    document.addEventListener('click', function (e) {
-        var wrap = $('.user-menu-wrap');
-        if (wrap && !wrap.contains(e.target) && $('#user-dropdown')) {
-            $('#user-dropdown').hidden = true;
-        }
-    });
-
-    if ($('#ud-switch')) $('#ud-switch').onclick = openAuthScreen;
-    if ($('#ud-logout')) {
-        $('#ud-logout').onclick = function () {
-            try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
-            currentUser = null;
-            openAuthScreen();
-        };
-    }
-
     function openDateModal() {
         if ($('#user-dropdown')) $('#user-dropdown').hidden = true;
         if ($('#exam-date-input')) $('#exam-date-input').value = (P && P.examDate) ? P.examDate : '';
         if ($('#date-modal')) $('#date-modal').hidden = false;
     }
 
-    if ($('#exam-card-btn')) $('#exam-card-btn').onclick = openDateModal;
-    if ($('#ud-exam-date')) $('#ud-exam-date').onclick = openDateModal;
+    function bindShellEvents() {
+        if ($('#menu')) $('#menu').onclick = openMobileDrawer;
+        if ($('#sb-close')) $('#sb-close').onclick = closeMobileDrawer;
+        if ($('#backdrop')) $('#backdrop').onclick = closeMobileDrawer;
 
-    if ($('#date-cancel-btn')) {
-        $('#date-cancel-btn').onclick = function () {
-            if ($('#date-modal')) $('#date-modal').hidden = true;
-        };
-    }
+        if ($('#sq')) {
+            $('#sq').oninput = function () {
+                var q = this.value.trim().toLowerCase();
+                if (!q) {
+                    route();
+                    return;
+                }
+                var jobMatches = getAllJobs().filter(function (j) {
+                    return j.agency.toLowerCase().indexOf(q) >= 0 || j.title.toLowerCase().indexOf(q) >= 0 || j.cat.toLowerCase().indexOf(q) >= 0;
+                });
+                var topicMatches = READING_TOPICS.filter(function (t) {
+                    return t.t.toLowerCase().indexOf(q) >= 0 || t.catTitle.toLowerCase().indexOf(q) >= 0;
+                });
+                var videoMatches = ALL_VIDEOS.filter(function (v) {
+                    return v.title.toLowerCase().indexOf(q) >= 0 || v.catTitle.toLowerCase().indexOf(q) >= 0;
+                });
+                var examMatches = PAST_EXAM_SETS.filter(function (e) {
+                    return e.title.toLowerCase().indexOf(q) >= 0 || e.catTitle.toLowerCase().indexOf(q) >= 0;
+                });
 
-    if ($('#date-clear-btn')) {
-        $('#date-clear-btn').onclick = function () {
-            P.examDate = '';
-            save();
-            updateCountdownSidebar();
-            if ($('#date-modal')) $('#date-modal').hidden = true;
-            if ((location.hash || '#home') === '#home') renderDashboard();
-        };
-    }
+                var resHtml = '';
+                if (jobMatches.length) {
+                    resHtml += '<div class="sb-group-title">📢 ประกาศรับสมัคร (' + jobMatches.length + ')</div>' +
+                        jobMatches.map(function (j) { return navLink('#jobs', '📢', j.cat + ' · ' + j.agency, false); }).join('');
+                }
+                if (topicMatches.length) {
+                    resHtml += '<div class="sb-group-title">📖 เนื้อหาอ่าน (' + topicMatches.length + ')</div>' +
+                        topicMatches.map(function (m) { return navLink('#' + m.k, '📄', m.t, false); }).join('');
+                }
+                if (videoMatches.length) {
+                    resHtml += '<div class="sb-group-title">🎬 คลิปติว (' + videoMatches.length + ')</div>' +
+                        videoMatches.map(function (v) { return navLink('#videos', '🎬', v.title, false); }).join('');
+                }
+                if (examMatches.length) {
+                    resHtml += '<div class="sb-group-title">📜 ข้อสอบเก่า (' + examMatches.length + ')</div>' +
+                        examMatches.map(function (e) { return navLink('#past-exams/' + e.id, '📜', e.title, false); }).join('');
+                }
 
-    if ($('#date-save-btn')) {
-        $('#date-save-btn').onclick = function () {
-            P.examDate = $('#exam-date-input').value;
-            save();
-            updateCountdownSidebar();
-            if ($('#date-modal')) $('#date-modal').hidden = true;
-            if ((location.hash || '#home') === '#home') renderDashboard();
-        };
+                if ($('#nav')) $('#nav').innerHTML = resHtml || '<div class="mu" style="padding:10px">ไม่พบหัวข้อที่ค้นหา</div>';
+            };
+        }
+
+        if ($('#fa')) {
+            $('#fa').onclick = function () {
+                P.fs = Math.max(13, (P.fs || 16) - 1);
+                applyPreferences();
+                save();
+            };
+        }
+
+        if ($('#fb')) {
+            $('#fb').onclick = function () {
+                P.fs = Math.min(24, (P.fs || 16) + 1);
+                applyPreferences();
+                save();
+            };
+        }
+
+        if ($('#th')) {
+            $('#th').onclick = function () {
+                var isDark = document.documentElement.dataset.theme === 'dark' ||
+                    (!document.documentElement.dataset.theme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                P.theme = isDark ? 'light' : 'dark';
+                applyPreferences();
+                save();
+            };
+        }
+
+        if ($('#hdr-check')) {
+            $('#hdr-check').onclick = function () {
+                if (location.hash !== '#home') {
+                    location.hash = '#home';
+                }
+                setTimeout(function () {
+                    var el = $('#daily-quests-card');
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 60);
+            };
+        }
+
+        if ($('#user-menu-btn')) {
+            $('#user-menu-btn').onclick = function (e) {
+                e.stopPropagation();
+                var dd = $('#user-dropdown');
+                if (dd) dd.hidden = !dd.hidden;
+            };
+        }
+
+        document.addEventListener('click', function (e) {
+            var wrap = $('.user-menu-wrap');
+            if (wrap && !wrap.contains(e.target) && $('#user-dropdown')) {
+                $('#user-dropdown').hidden = true;
+            }
+        });
+
+        if ($('#ud-switch')) $('#ud-switch').onclick = openAuthScreen;
+        if ($('#ud-logout')) {
+            $('#ud-logout').onclick = function () {
+                try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+                currentUser = null;
+                openAuthScreen();
+            };
+        }
+
+        if ($('#exam-card-btn')) $('#exam-card-btn').onclick = openDateModal;
+        if ($('#ud-exam-date')) $('#ud-exam-date').onclick = openDateModal;
+
+        if ($('#date-cancel-btn')) {
+            $('#date-cancel-btn').onclick = function () {
+                if ($('#date-modal')) $('#date-modal').hidden = true;
+            };
+        }
+
+        if ($('#date-clear-btn')) {
+            $('#date-clear-btn').onclick = function () {
+                P.examDate = '';
+                save();
+                updateCountdownSidebar();
+                if ($('#date-modal')) $('#date-modal').hidden = true;
+                if ((location.hash || '#home') === '#home') renderDashboard();
+            };
+        }
+
+        if ($('#date-save-btn')) {
+            $('#date-save-btn').onclick = function () {
+                P.examDate = $('#exam-date-input').value;
+                save();
+                updateCountdownSidebar();
+                if ($('#date-modal')) $('#date-modal').hidden = true;
+                if ((location.hash || '#home') === '#home') renderDashboard();
+            };
+        }
     }
 
     /* ----------------------------------------------------------------------
-       Bootstrap Application
+       Bootstrap Application (Runs after all <script> tags finish loading)
        ---------------------------------------------------------------------- */
-    window.addEventListener('hashchange', route);
+    function bootstrap() {
+        buildDataIndex();
+        bindAuthEvents();
+        bindShellEvents();
+        window.addEventListener('hashchange', route);
 
-    (function init() {
         var session = store.get(SESSION_KEY, null);
         var users = store.get(USERS_KEY, {});
         if (session && session.email && users[session.email]) {
@@ -1974,5 +1998,11 @@
         } else {
             openAuthScreen();
         }
-    })();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bootstrap);
+    } else {
+        bootstrap();
+    }
 })();
