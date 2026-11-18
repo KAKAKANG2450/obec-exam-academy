@@ -12,18 +12,20 @@
         var watchUrl = 'https://www.youtube.com/watch?v=' + videoId;
         var embedUrl = 'https://www.youtube.com/embed/' + videoId;
         return (
-            '<div style="margin:18px 0;padding:14px;border:1px solid var(--bd, #e2e8f0);border-radius:12px;background:var(--bg, #f8fafc)">' +
-            '  <div style="font-weight:700;margin-bottom:4px">🎬 ' + title + '</div>' +
-            '  <div class="mu" style="font-size:0.88em;margin-bottom:10px">ช่อง: ' + channel + (note ? ' · ' + note : '') + '</div>' +
-            '  <div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:10px;background:#000">' +
-            '    <iframe src="' + embedUrl + '" title="' + title + '" loading="lazy" ' +
-            '      style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" ' +
-            '      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>' +
-            '  </div>' +
-            '  <div style="margin-top:8px;text-align:right">' +
-            '    <a href="' + watchUrl + '" target="_blank" rel="noopener noreferrer" style="font-size:0.85em;font-weight:600;color:var(--pr, #2563eb)">เปิดดูบน YouTube โดยตรง ↗</a>' +
-            '  </div>' +
+
+            '<div class="youtube-wrapper">' +
+            '<iframe ' +
+            'src="' + embedUrl + '" ' +
+            'title="' + escapeHtml(title) + '" ' +
+            'loading="lazy" ' +
+            'referrerpolicy="strict-origin-when-cross-origin" ' +
+            'allow="accelerometer; autoplay; ' +
+            'clipboard-write; encrypted-media; ' +
+            'gyroscope; picture-in-picture; web-share" ' +
+            'allowfullscreen>' +
+            '</iframe>' +
             '</div>'
+
         );
     }
 
