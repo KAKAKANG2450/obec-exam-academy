@@ -8,26 +8,59 @@
 
     if (typeof D === 'undefined' || !Array.isArray(D)) return;
 
-    function ytBox(videoId, title, channel, note) {
-        var watchUrl = 'https://www.youtube.com/watch?v=' + videoId;
-        var embedUrl = 'https://www.youtube.com/embed/' + videoId;
-        return (
+    
+function ytBox(videoId, title, channel, note) {
+    var id = encodeURIComponent(String(videoId || ''));
 
-            '<div class="youtube-wrapper">' +
-            '<iframe ' +
-            'src="' + embedUrl + '" ' +
-            'title="' + escapeHtml(title) + '" ' +
-            'loading="lazy" ' +
-            'referrerpolicy="strict-origin-when-cross-origin" ' +
-            'allow="accelerometer; autoplay; ' +
-            'clipboard-write; encrypted-media; ' +
-            'gyroscope; picture-in-picture; web-share" ' +
-            'allowfullscreen>' +
-            '</iframe>' +
-            '</div>'
+    var watchUrl = 'https://www.youtube.com/watch?v=' + id;
+    var embedUrl = 'https://www.youtube.com/embed/' + id;
 
-        );
+    function escapeHtml(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
+
+    return (
+        '<div class="youtube-card">' +
+
+        '<h3 class="youtube-title">🎬 ' +
+        escapeHtml(title) + '</h3>' +
+
+        '<p class="youtube-channel">ช่อง: ' +
+        escapeHtml(channel) + '</p>' +
+
+        '<div class="youtube-wrapper">' +
+        '<iframe ' +
+        'src="' + embedUrl + '" ' +
+        'title="' + escapeHtml(title) + '" ' +
+        'loading="lazy" ' +
+        'referrerpolicy="strict-origin-when-cross-origin" ' +
+        'allow="accelerometer; autoplay; clipboard-write; ' +
+        'encrypted-media; gyroscope; picture-in-picture; web-share" ' +
+        'allowfullscreen>' +
+        '</iframe>' +
+        '</div>' +
+
+        '<div class="youtube-footer">' +
+        '<a href="' + watchUrl + '" ' +
+        'target="_blank" rel="noopener noreferrer">' +
+        '▶ ดูวิดีโอบน YouTube โดยตรง ↗' +
+        '</a>' +
+        '</div>' +
+
+        (note
+            ? '<p class="youtube-note">' +
+              escapeHtml(note) + '</p>'
+            : '') +
+
+        '</div>'
+    );
+}
+
 
     var AGENCY_ADDITIONS = {
         /* ==================================================================

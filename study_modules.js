@@ -9,12 +9,12 @@
 
     // Helper สร้างกล่องเล่นวิดีโอ YouTube แบบ Responsive พร้อมลิงก์สำรอง
     
-function ytBox(videoId, title, channel, note) {
-    var watchUrl = 'https://www.youtube.com/watch?v=' +
-        encodeURIComponent(videoId);
 
-    var embedUrl = 'https://www.youtube.com/embed/' +
-        encodeURIComponent(videoId);
+function ytBox(videoId, title, channel, note) {
+    var id = encodeURIComponent(String(videoId || ''));
+
+    var watchUrl = 'https://www.youtube.com/watch?v=' + id;
+    var embedUrl = 'https://www.youtube.com/embed/' + id;
 
     function escapeHtml(value) {
         return String(value == null ? '' : value)
@@ -27,8 +27,12 @@ function ytBox(videoId, title, channel, note) {
 
     return (
         '<div class="youtube-card">' +
-        '<h3>🎬 ' + escapeHtml(title) + '</h3>' +
-        '<p>ช่อง: ' + escapeHtml(channel) + '</p>' +
+
+        '<h3 class="youtube-title">🎬 ' +
+        escapeHtml(title) + '</h3>' +
+
+        '<p class="youtube-channel">ช่อง: ' +
+        escapeHtml(channel) + '</p>' +
 
         '<div class="youtube-wrapper">' +
         '<iframe ' +
@@ -42,16 +46,22 @@ function ytBox(videoId, title, channel, note) {
         '</iframe>' +
         '</div>' +
 
-        '<p style="margin-top:10px">' +
-        '<a href="' + watchUrl + '" target="_blank" ' +
-        'rel="noopener noreferrer">' +
-        '▶ ดูวิดีโอบน YouTube โดยตรง' +
-        '</a></p>' +
+        '<div class="youtube-footer">' +
+        '<a href="' + watchUrl + '" ' +
+        'target="_blank" rel="noopener noreferrer">' +
+        '▶ ดูวิดีโอบน YouTube โดยตรง ↗' +
+        '</a>' +
+        '</div>' +
 
-        (note ? '<p>' + escapeHtml(note) + '</p>' : '') +
+        (note
+            ? '<p class="youtube-note">' +
+              escapeHtml(note) + '</p>'
+            : '') +
+
         '</div>'
     );
 }
+
 
 
     var STUDY_MODULES = {

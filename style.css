@@ -1635,5 +1635,89 @@ code {
     }
 }
 
+/* ========================================
+   YouTube Video Player - Responsive
+======================================== */
+
+.youtube-card {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    margin: 18px 0;
+    padding: 14px;
+    background: var(--card-soft, #f8fafc);
+    border: 1px solid var(--bd, #e2e8f0);
+    border-radius: 12px;
+}
+
+.youtube-title {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0 0 6px;
+}
+
+.youtube-channel {
+    font-size: 14px;
+    color: var(--mu, #64748b);
+    margin: 0 0 12px;
+}
+
+.youtube-wrapper {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-radius: 10px;
+    background: #000;
+}
+
+.youtube-wrapper iframe {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+.youtube-footer {
+    margin-top: 10px;
+    text-align: right;
+}
+
+.youtube-footer a {
+    color: var(--pr, #0d9488);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.youtube-footer a:hover {
+    text-decoration: underline;
+}
+
+.youtube-note {
+    margin: 10px 0 0;
+    font-size: 14px;
+    color: var(--mu, #64748b);
+}
+
+@media (max-width: 600px) {
+    .youtube-card {
+        padding: 10px;
+    }
+
+    .youtube-title {
+        font-size: 15px;
+    }
+
+    .youtube-channel {
+        font-size: 13px;
+    }
+}
+
+
 
 }
