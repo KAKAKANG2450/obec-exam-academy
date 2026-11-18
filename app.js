@@ -8,9 +8,6 @@
     var $ = function (sel) { return document.querySelector(sel); };
     var $$ = function (sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); };
 
-    /* ----------------------------------------------------------------------
-       Safe Escaping & Hashing (Works on file://, http://, and https://)
-       ---------------------------------------------------------------------- */
     function esc(str) {
         return String(str == null ? '' : str)
             .replace(/&/g, '&amp;')
@@ -53,9 +50,6 @@
         return d.getFullYear() + '-' + m + '-' + day;
     }
 
-    /* ----------------------------------------------------------------------
-       Safe LocalStorage Wrapper
-       ---------------------------------------------------------------------- */
     var store = {
         get: function (key, fallback) {
             try {
@@ -72,9 +66,6 @@
         }
     };
 
-    /* ----------------------------------------------------------------------
-       Data Indexing & Automatic Separation into 4 Parts + Jobs Board
-       ---------------------------------------------------------------------- */
     var CAT_META = {
         a: { color: '#2563eb', icon: 'ก', short: 'ภาค ก' },
         b: { color: '#7c3aed', icon: 'ข๑', short: 'ข ส่วน 1' },
@@ -82,6 +73,7 @@
         d: { color: '#ea580c', icon: 'ค', short: 'ภาค ค' }
     };
 
+    var DATA_CATS = (typeof D !== 'undefined' && Array.isArray(D)) ? D : [];
     var READING_TOPICS = [];
     var ALL_VIDEOS = [];
     var CHAPTER_QUIZZES = [];
@@ -116,12 +108,12 @@
         return tmp.innerHTML.trim();
     }
 
-    D.forEach(function (cat) {
-        cat.s.forEach(function (sec, idx) {
+    DATA_CATS.forEach(function (cat) {
+        (cat.s || []).forEach(function (sec, idx) {
             var key = cat.id + '/' + idx;
             var pastQuizBlk = null;
 
-            sec.b.forEach(function (blk) {
+            (sec.b || []).forEach(function (blk) {
                 if (blk.k === 'quiz' && String(blk.id || '').indexOf('past_') === 0) {
                     pastQuizBlk = blk;
                 }
@@ -139,7 +131,7 @@
                 var cleanBlocks = [];
                 var chapterQuizBlk = null;
 
-                sec.b.forEach(function (blk) {
+                (sec.b || []).forEach(function (blk) {
                     if (blk.k === 'h') {
                         var cleanedHtml = extractVideosFromHtml(blk.v, cat, sec);
                         if (cleanedHtml) {
@@ -171,7 +163,7 @@
                 });
             }
 
-            sec.b.forEach(function (blk) {
+            (sec.b || []).forEach(function (blk) {
                 if (blk.k === 'quiz' && Array.isArray(blk.qs)) {
                     blk.qs.forEach(function (q, qIdx) {
                         ALL_QUESTIONS.push({
@@ -220,26 +212,26 @@
 
     function defaultProgress() {
         return {
-            completed: {},  // บทเรียนที่อ่าน/ผ่านแล้ว { "a/0": 1 }
-            qz: {},         // คะแนนล่าสุดรายชุด { "a0": { score: 3, total: 4 } }
-            qLog: {},       // ประวัติการตอบรายข้อ { "a0_0": true/false }
-            mistakes: [],   // รายการข้อที่เคยตอบผิด [uid, ...]
-            fc: {},         // บัตรคำที่จำได้ { "b6": [0, 1] }
-            customJobs: [], // ประกาศรับสมัครงานที่ผู้ใช้เพิ่มเอง
-            jobStatus: {},  // สถานะติดตามงาน { "job_id": "saved" | "applied" }
-            jobDates: {},   // วันที่รับสมัครที่ผู้ใช้อัปเดตเอง { "job_id": "20 พ.ย. – 4 ธ.ค. 2569" }
-            xp: 0,          // คะแนน XP สะสม
-            streak: 0,      // วันต่อเนื่อง
-            activeDays: {}, // ประวัติวันที่เข้าเรียน { "2026-11-18": true }
+            completed: {},
+            qz: {},
+            qLog: {},
+            mistakes: [],
+            fc: {},
+            customJobs: [],
+            jobStatus: {},
+            jobDates: {},
+            xp: 0,
+            streak: 0,
+            activeDays: {},
             daily: {
                 date: todayKey(),
                 xp: 0,
                 answered: 0,
                 passed80: 0
             },
-            examDate: '',   // วันสอบเป้าหมาย YYYY-MM-DD
-            fs: 16,         // ขนาดตัวอักษร
-            theme: ''       // light / dark / ''
+            examDate: '',
+            fs: 16,
+            theme: ''
         };
     }
 
@@ -329,9 +321,9 @@
         updateCountdownSidebar();
         updateTopbarStats();
 
-        $('#auth-screen').hidden = true;
-        $('#app-shell').hidden = false;
-        $('#tabs').hidden = false;
+        if ($('#auth-screen')) $('#auth-screen').hidden = true;
+        if ($('#app-shell')) $('#app-shell').hidden = false;
+        if ($('#tabs')) $('#tabs').hidden = false;
         route();
     }
 
@@ -339,16 +331,16 @@
         if (!currentUser) return;
         var name = currentUser.name || currentUser.email.split('@')[0];
         var initial = name.charAt(0).toUpperCase();
-        $('#user-avatar').textContent = initial;
-        $('#user-display-name').textContent = name;
-        $('#ud-name').textContent = name;
-        $('#ud-email').textContent = currentUser.email;
+        if ($('#user-avatar')) $('#user-avatar').textContent = initial;
+        if ($('#user-display-name')) $('#user-display-name').textContent = name;
+        if ($('#ud-name')) $('#ud-name').textContent = name;
+        if ($('#ud-email')) $('#ud-email').textContent = currentUser.email;
     }
 
     function updateTopbarStats() {
         if (!P) return;
-        $('#hdr-streak').textContent = P.streak || 0;
-        $('#hdr-xp').textContent = P.xp || 0;
+        if ($('#hdr-streak')) $('#hdr-streak').textContent = P.streak || 0;
+        if ($('#hdr-xp')) $('#hdr-xp').textContent = P.xp || 0;
     }
 
     function getCountdownInfo() {
@@ -371,7 +363,9 @@
 
     function updateCountdownSidebar() {
         var info = getCountdownInfo();
-        $('#sb-countdown-text').textContent = info ? info.shortText : 'ตั้งวันสอบ · คลิกแก้ไข';
+        if ($('#sb-countdown-text')) {
+            $('#sb-countdown-text').textContent = info ? info.shortText : 'ตั้งวันสอบ · คลิกแก้ไข';
+        }
     }
 
     /* ----------------------------------------------------------------------
@@ -384,15 +378,18 @@
         $$('.auth-tab').forEach(function (btn) {
             btn.classList.toggle('active', btn.dataset.authMode === mode);
         });
-        $('#auth-name-group').hidden = (mode !== 'register');
-        $('#auth-submit').textContent = (mode === 'register')
-            ? 'สร้างบัญชีและเริ่มติวสอบ'
-            : 'เข้าสู่ระบบด้วย Email';
-        $('#auth-error').hidden = true;
+        if ($('#auth-name-group')) $('#auth-name-group').hidden = (mode !== 'register');
+        if ($('#auth-submit')) {
+            $('#auth-submit').textContent = (mode === 'register')
+                ? 'สร้างบัญชีและเริ่มติวสอบ'
+                : 'เข้าสู่ระบบด้วย Email';
+        }
+        if ($('#auth-error')) $('#auth-error').hidden = true;
     }
 
     function showAuthError(msg) {
         var box = $('#auth-error');
+        if (!box) return;
         box.textContent = msg;
         box.hidden = false;
     }
@@ -402,6 +399,7 @@
         var emails = Object.keys(users);
         var box = $('#saved-accounts-box');
         var list = $('#saved-accounts-list');
+        if (!box || !list) return;
         if (!emails.length) {
             box.hidden = true;
             return;
@@ -427,10 +425,10 @@
     }
 
     function openAuthScreen() {
-        $('#app-shell').hidden = true;
-        $('#tabs').hidden = true;
-        $('#user-dropdown').hidden = true;
-        $('#auth-screen').hidden = false;
+        if ($('#app-shell')) $('#app-shell').hidden = true;
+        if ($('#tabs')) $('#tabs').hidden = true;
+        if ($('#user-dropdown')) $('#user-dropdown').hidden = true;
+        if ($('#auth-screen')) $('#auth-screen').hidden = false;
         renderSavedAccounts();
     }
 
@@ -438,75 +436,81 @@
         tab.onclick = function () { setAuthMode(tab.dataset.authMode); };
     });
 
-    $('#toggle-pass').onclick = function () {
-        var inp = $('#auth-pass');
-        inp.type = (inp.type === 'password') ? 'text' : 'password';
-    };
+    if ($('#toggle-pass')) {
+        $('#toggle-pass').onclick = function () {
+            var inp = $('#auth-pass');
+            inp.type = (inp.type === 'password') ? 'text' : 'password';
+        };
+    }
 
-    $('#auth-form').onsubmit = function (e) {
-        e.preventDefault();
-        var email = $('#auth-email').value.trim().toLowerCase();
-        var pass = $('#auth-pass').value;
-        var nameInput = $('#auth-name').value.trim();
+    if ($('#auth-form')) {
+        $('#auth-form').onsubmit = function (e) {
+            e.preventDefault();
+            var email = $('#auth-email').value.trim().toLowerCase();
+            var pass = $('#auth-pass').value;
+            var nameInput = $('#auth-name').value.trim();
 
-        var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-        if (!emailRegex.test(email)) {
-            showAuthError('กรุณากรอกรูปแบบ Email ให้ถูกต้อง (เช่น name@example.com)');
-            $('#auth-email').focus();
-            return;
-        }
-        if (!pass || pass.length < 4) {
-            showAuthError('กรุณากรอกรหัสผ่านอย่างน้อย 4 ตัวอักษร');
-            $('#auth-pass').focus();
-            return;
-        }
-
-        var users = store.get(USERS_KEY, {});
-        var hashed = hashSecret(email + ':' + pass);
-
-        if (authMode === 'register') {
-            if (users[email]) {
-                showAuthError('อีเมลนี้มีบัญชีอยู่แล้ว กรุณากดแท็บ "เข้าสู่ระบบ"');
+            var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+            if (!emailRegex.test(email)) {
+                showAuthError('กรุณากรอกรูปแบบ Email ให้ถูกต้อง (เช่น name@example.com)');
+                $('#auth-email').focus();
                 return;
             }
-            var newUser = {
-                email: email,
-                name: nameInput || email.split('@')[0],
-                passHash: hashed,
-                createdAt: Date.now()
-            };
-            users[email] = newUser;
-            store.set(USERS_KEY, users);
-            loadUserSession(newUser);
-        } else {
-            var existing = users[email];
-            if (!existing) {
-                showAuthError('ไม่พบบัญชีอีเมลนี้ กรุณากดแท็บ "สมัครสมาชิกใหม่" เพื่อสร้างบัญชี');
-                return;
-            }
-            if (existing.passHash !== hashed) {
-                showAuthError('รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
+            if (!pass || pass.length < 4) {
+                showAuthError('กรุณากรอกรหัสผ่านอย่างน้อย 4 ตัวอักษร');
                 $('#auth-pass').focus();
                 return;
             }
-            loadUserSession(existing);
-        }
-    };
 
-    $('#demo-login-btn').onclick = function () {
-        var users = store.get(USERS_KEY, {});
-        var demoEmail = 'demo@obec-academy.th';
-        if (!users[demoEmail]) {
-            users[demoEmail] = {
-                email: demoEmail,
-                name: 'ผู้เข้าสอบ สพฐ. (Demo)',
-                passHash: hashSecret(demoEmail + ':demo'),
-                createdAt: Date.now()
-            };
-            store.set(USERS_KEY, users);
-        }
-        loadUserSession(users[demoEmail]);
-    };
+            var users = store.get(USERS_KEY, {});
+            var hashed = hashSecret(email + ':' + pass);
+
+            if (authMode === 'register') {
+                if (users[email]) {
+                    showAuthError('อีเมลนี้มีบัญชีอยู่แล้ว กรุณากดแท็บ "เข้าสู่ระบบ"');
+                    return;
+                }
+                var newUser = {
+                    email: email,
+                    name: nameInput || email.split('@')[0],
+                    passHash: hashed,
+                    createdAt: Date.now()
+                };
+                users[email] = newUser;
+                store.set(USERS_KEY, users);
+                loadUserSession(newUser);
+            } else {
+                var existing = users[email];
+                if (!existing) {
+                    showAuthError('ไม่พบบัญชีอีเมลนี้ กรุณากดแท็บ "สมัครสมาชิกใหม่" เพื่อสร้างบัญชี');
+                    return;
+                }
+                if (existing.passHash !== hashed) {
+                    showAuthError('รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
+                    $('#auth-pass').focus();
+                    return;
+                }
+                loadUserSession(existing);
+            }
+        };
+    }
+
+    if ($('#demo-login-btn')) {
+        $('#demo-login-btn').onclick = function () {
+            var users = store.get(USERS_KEY, {});
+            var demoEmail = 'demo@obec-academy.th';
+            if (!users[demoEmail]) {
+                users[demoEmail] = {
+                    email: demoEmail,
+                    name: 'ผู้เข้าสอบ สพฐ. (Demo)',
+                    passHash: hashSecret(demoEmail + ':demo'),
+                    createdAt: Date.now()
+                };
+                store.set(USERS_KEY, users);
+            }
+            loadUserSession(users[demoEmail]);
+        };
+    }
 
     /* ----------------------------------------------------------------------
        HTML Helpers & Interactive Components (Quiz, Flashcards, Subnet)
@@ -737,7 +741,7 @@
         html += navLink('#jobs', '📢', 'ประกาศรับตำแหน่งงาน', currentRoute === 'jobs', getAllJobs().length);
 
         html += '<div class="sb-group-title">1. ส่วนเนื้อหาอ่าน</div>';
-        D.forEach(function (cat) {
+        DATA_CATS.forEach(function (cat) {
             var catTopics = READING_TOPICS.filter(function (t) { return t.c === cat.id; });
             var doneCount = catTopics.filter(function (t) { return !!P.completed[t.k]; }).length;
             var isCatActive = currentRoute.indexOf(cat.id + '/') === 0;
@@ -778,7 +782,7 @@
         html += '<div class="sb-group-title">ติดตามผล</div>';
         html += navLink('#prog', '📈', 'Progress & สำรองข้อมูล', currentRoute === 'prog');
 
-        $('#nav').innerHTML = html;
+        if ($('#nav')) $('#nav').innerHTML = html;
         closeMobileDrawer();
     }
 
@@ -793,6 +797,7 @@
     }
 
     function renderMobileTabs(currentRoute) {
+        if (!$('#tabs')) return;
         var firstTopic = READING_TOPICS[0] ? ('#' + READING_TOPICS[0].k) : '#home';
         var items = [
             { href: '#home', ic: '🏠', label: 'หน้าหลัก', on: currentRoute === 'home' },
@@ -810,12 +815,12 @@
        Dashboard View
        ---------------------------------------------------------------------- */
     function renderDashboard() {
-        $('#page-title').textContent = 'Dashboard';
+        if ($('#page-title')) $('#page-title').textContent = 'Dashboard';
 
         var totalTopics = READING_TOPICS.length || 1;
         var readTopics = READING_TOPICS.filter(function (t) { return !!P.completed[t.k]; });
-        var nextTopic = READING_TOPICS.filter(function (t) { return !P.completed[t.k]; })[0] || READING_TOPICS[0];
-        var nextCatCode = nextTopic ? CAT_META[nextTopic.c].short : '';
+        var nextTopic = READING_TOPICS.filter(function (t) { return !P.completed[t.k]; })[0] || READING_TOPICS[0] || { k: 'home', c: 'a', catTitle: 'ภาค ก', t: 'เริ่มเตรียมสอบ' };
+        var nextCatCode = (CAT_META[nextTopic.c] && CAT_META[nextTopic.c].short) || '';
 
         var cd = getCountdownInfo();
         var countdownHtml = cd
@@ -842,8 +847,8 @@
             '<rect x="126" y="118" width="6" height="33" rx="2" fill="#334155"/>' +
             '</svg>';
 
-        var catCardsHtml = D.map(function (cat) {
-            var meta = CAT_META[cat.id];
+        var catCardsHtml = DATA_CATS.map(function (cat) {
+            var meta = CAT_META[cat.id] || { color: '#2563eb', icon: '📘' };
             var catTopics = READING_TOPICS.filter(function (t) { return t.c === cat.id; });
             var totalSec = catTopics.length;
             var doneSec = catTopics.filter(function (t) { return !!P.completed[t.k]; }).length;
@@ -1017,14 +1022,14 @@
             '  </div>' +
             '</div>';
 
-        $('#hero-countdown-btn').onclick = openDateModal;
+        if ($('#hero-countdown-btn')) $('#hero-countdown-btn').onclick = openDateModal;
     }
 
     /* ----------------------------------------------------------------------
-       Jobs & Recruitment Announcements Page (ประกาศรับตำแหน่งนักวิชาการคอมพิวเตอร์)
+       Jobs & Recruitment Announcements Page
        ---------------------------------------------------------------------- */
     function renderJobsPage() {
-        $('#page-title').textContent = 'ประกาศรับตำแหน่งงาน';
+        if ($('#page-title')) $('#page-title').textContent = 'ประกาศรับตำแหน่งงาน';
         var selectedCat = 'all';
         var searchQuery = '';
         var showAddForm = false;
@@ -1325,7 +1330,7 @@
     }
 
     /* ----------------------------------------------------------------------
-       1. Reading Lesson Page View (เฉพาะส่วนเนื้อหาอ่าน + ตาราง + Flashcards)
+       1. Reading Lesson Page View
        ---------------------------------------------------------------------- */
     function renderLessonPage(catId, secIdx) {
         var topicKey = catId + '/' + secIdx;
@@ -1338,7 +1343,7 @@
         var catTopics = READING_TOPICS.filter(function (x) { return x.c === catId; });
         var posInCat = catTopics.findIndex(function (x) { return x.k === topicKey; });
 
-        $('#page-title').textContent = topic.t;
+        if ($('#page-title')) $('#page-title').textContent = topic.t;
         var mainEl = $('#main');
         mainEl.style.setProperty('--cc', meta.color);
         mainEl.innerHTML =
@@ -1417,10 +1422,10 @@
     }
 
     /* ----------------------------------------------------------------------
-       2. Video Tutorials Hub View (ส่วนคลิปติว YouTube แยกหมวด)
+       2. Video Tutorials Hub View
        ---------------------------------------------------------------------- */
     function renderVideosPage() {
-        $('#page-title').textContent = 'คลิปติว YouTube';
+        if ($('#page-title')) $('#page-title').textContent = 'คลิปติว YouTube';
         var selectedCat = 'all';
 
         function draw() {
@@ -1431,7 +1436,7 @@
             var filterBtns =
                 '<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:12px">' +
                 '<button type="button" class="' + (selectedCat === 'all' ? 'btn-primary' : 'btn-outline') + '" data-vcat="all">ทั้งหมด (' + ALL_VIDEOS.length + ')</button>' +
-                D.map(function (c) {
+                DATA_CATS.map(function (c) {
                     var cnt = ALL_VIDEOS.filter(function (v) { return v.catId === c.id; }).length;
                     return '<button type="button" class="' + (selectedCat === c.id ? 'btn-primary' : 'btn-outline') + '" data-vcat="' + c.id + '">' + esc(CAT_META[c.id].short) + ' (' + cnt + ')</button>';
                 }).join('') +
@@ -1472,7 +1477,7 @@
        3. Chapter Quizzes & 4. Past Exams Hub
        ---------------------------------------------------------------------- */
     function renderQuizSetListPage(options) {
-        $('#page-title').textContent = options.pageTitle;
+        if ($('#page-title')) $('#page-title').textContent = options.pageTitle;
         var selectedCat = 'all';
 
         function draw() {
@@ -1483,7 +1488,7 @@
             var filterBtns =
                 '<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:12px">' +
                 '<button type="button" class="' + (selectedCat === 'all' ? 'btn-primary' : 'btn-outline') + '" data-qcat="all">ทั้งหมด (' + options.sets.length + ' ชุด)</button>' +
-                D.map(function (c) {
+                DATA_CATS.map(function (c) {
                     var cnt = options.sets.filter(function (s) { return s.catId === c.id; }).length;
                     return '<button type="button" class="' + (selectedCat === c.id ? 'btn-primary' : 'btn-outline') + '" data-qcat="' + c.id + '">' + esc(CAT_META[c.id].short) + ' (' + cnt + ')</button>';
                 }).join('') +
@@ -1536,7 +1541,7 @@
 
     function renderSingleQuizSet(setObj, backHref, backLabel) {
         var title = setObj.title || setObj.topicTitle;
-        $('#page-title').textContent = title;
+        if ($('#page-title')) $('#page-title').textContent = title;
         $('#main').innerHTML =
             '<div class="lesson-wrap">' +
             '  <div class="card">' +
@@ -1591,7 +1596,7 @@
     }
 
     function renderQuizCollection(title, subtitle, questions, emptyMsg) {
-        $('#page-title').textContent = title;
+        if ($('#page-title')) $('#page-title').textContent = title;
         $('#main').innerHTML =
             '<div class="lesson-wrap">' +
             '  <div class="card">' +
@@ -1652,7 +1657,7 @@
     }
 
     function renderAllFlashcards() {
-        $('#page-title').textContent = 'Flashcards Deck';
+        if ($('#page-title')) $('#page-title').textContent = 'Flashcards Deck';
         $('#main').innerHTML =
             '<div class="lesson-wrap">' +
             '  <div class="card">' +
@@ -1674,7 +1679,7 @@
        Progress & Backup View
        ---------------------------------------------------------------------- */
     function renderProgressPage() {
-        $('#page-title').textContent = 'Progress & สำรองข้อมูล';
+        if ($('#page-title')) $('#page-title').textContent = 'Progress & สำรองข้อมูล';
 
         var totalTopics = READING_TOPICS.length || 1;
         var doneTopics = READING_TOPICS.filter(function (t) { return !!P.completed[t.k]; }).length;
@@ -1745,188 +1750,216 @@
     }
 
     /* ----------------------------------------------------------------------
-       Router
+       Router (With Safe Error Boundary)
        ---------------------------------------------------------------------- */
     function route() {
         if (!currentUser) return;
-        var hash = (location.hash || '#home').replace(/^#/, '');
-        if (!hash) hash = 'home';
+        try {
+            var hash = (location.hash || '#home').replace(/^#/, '');
+            if (!hash) hash = 'home';
 
-        renderSidebar(hash);
-        renderMobileTabs(hash);
+            renderSidebar(hash);
+            renderMobileTabs(hash);
 
-        if (hash === 'home') {
-            renderDashboard();
-        } else if (hash === 'jobs') {
-            renderJobsPage();
-        } else if (hash === 'videos') {
-            renderVideosPage();
-        } else if (hash === 'quizzes') {
-            renderQuizzesHub(null);
-        } else if (hash.indexOf('quizzes/') === 0) {
-            renderQuizzesHub(hash.split('/')[1]);
-        } else if (hash === 'past-exams') {
-            renderPastExamsHub(null);
-        } else if (hash.indexOf('past-exams/') === 0) {
-            renderPastExamsHub(hash.split('/')[1]);
-        } else if (hash === 'prog') {
-            renderProgressPage();
-        } else if (hash === 'qbank') {
-            renderQuestionBank();
-        } else if (hash === 'mock') {
-            renderMockExam();
-        } else if (hash === 'mistakes') {
-            renderReviewMistakes();
-        } else if (hash === 'flashcards') {
-            renderAllFlashcards();
-        } else if (/^[abcd]\//.test(hash)) {
-            var parts = hash.split('/');
-            renderLessonPage(parts[0], Number(parts[1]));
-        } else {
-            renderDashboard();
+            if (hash === 'home') {
+                renderDashboard();
+            } else if (hash === 'jobs') {
+                renderJobsPage();
+            } else if (hash === 'videos') {
+                renderVideosPage();
+            } else if (hash === 'quizzes') {
+                renderQuizzesHub(null);
+            } else if (hash.indexOf('quizzes/') === 0) {
+                renderQuizzesHub(hash.split('/')[1]);
+            } else if (hash === 'past-exams') {
+                renderPastExamsHub(null);
+            } else if (hash.indexOf('past-exams/') === 0) {
+                renderPastExamsHub(hash.split('/')[1]);
+            } else if (hash === 'prog') {
+                renderProgressPage();
+            } else if (hash === 'qbank') {
+                renderQuestionBank();
+            } else if (hash === 'mock') {
+                renderMockExam();
+            } else if (hash === 'mistakes') {
+                renderReviewMistakes();
+            } else if (hash === 'flashcards') {
+                renderAllFlashcards();
+            } else if (/^[abcd]\//.test(hash)) {
+                var parts = hash.split('/');
+                renderLessonPage(parts[0], Number(parts[1]));
+            } else {
+                renderDashboard();
+            }
+
+            window.scrollTo(0, 0);
+        } catch (err) {
+            if ($('#main')) {
+                $('#main').innerHTML =
+                    '<div class="lesson-wrap"><div class="card" style="border-left:4px solid var(--rose)">' +
+                    '<h3>⚠️ พบข้อผิดพลาดในการแสดงผลหน้าเว็บ</h3>' +
+                    '<p>สาเหตุ: <code>' + esc(err && err.message ? err.message : String(err)) + '</code></p>' +
+                    '<p class="mu">กรุณาตรวจสอบว่าไฟล์ <code>data.js</code>, <code>jobs_board.js</code> และ <code>app.js</code> อยู่ในโฟลเดอร์เดียวกันและไม่มีอักขระตกหล่น</p>' +
+                    '</div></div>';
+            }
         }
-
-        window.scrollTo(0, 0);
     }
 
     /* ----------------------------------------------------------------------
        Header Controls, Mobile Drawer & Exam Date Modal
        ---------------------------------------------------------------------- */
     function openMobileDrawer() {
-        $('#sidebar').classList.add('open');
-        $('#backdrop').classList.add('show');
+        if ($('#sidebar')) $('#sidebar').classList.add('open');
+        if ($('#backdrop')) $('#backdrop').classList.add('show');
     }
 
     function closeMobileDrawer() {
-        $('#sidebar').classList.remove('open');
-        $('#backdrop').classList.remove('show');
+        if ($('#sidebar')) $('#sidebar').classList.remove('open');
+        if ($('#backdrop')) $('#backdrop').classList.remove('show');
     }
 
-    $('#menu').onclick = openMobileDrawer;
-    $('#sb-close').onclick = closeMobileDrawer;
-    $('#backdrop').onclick = closeMobileDrawer;
+    if ($('#menu')) $('#menu').onclick = openMobileDrawer;
+    if ($('#sb-close')) $('#sb-close').onclick = closeMobileDrawer;
+    if ($('#backdrop')) $('#backdrop').onclick = closeMobileDrawer;
 
-    $('#sq').oninput = function () {
-        var q = this.value.trim().toLowerCase();
-        if (!q) {
-            route();
-            return;
-        }
-        var jobMatches = getAllJobs().filter(function (j) {
-            return j.agency.toLowerCase().indexOf(q) >= 0 || j.title.toLowerCase().indexOf(q) >= 0 || j.cat.toLowerCase().indexOf(q) >= 0;
-        });
-        var topicMatches = READING_TOPICS.filter(function (t) {
-            return t.t.toLowerCase().indexOf(q) >= 0 || t.catTitle.toLowerCase().indexOf(q) >= 0;
-        });
-        var videoMatches = ALL_VIDEOS.filter(function (v) {
-            return v.title.toLowerCase().indexOf(q) >= 0 || v.catTitle.toLowerCase().indexOf(q) >= 0;
-        });
-        var examMatches = PAST_EXAM_SETS.filter(function (e) {
-            return e.title.toLowerCase().indexOf(q) >= 0 || e.catTitle.toLowerCase().indexOf(q) >= 0;
-        });
+    if ($('#sq')) {
+        $('#sq').oninput = function () {
+            var q = this.value.trim().toLowerCase();
+            if (!q) {
+                route();
+                return;
+            }
+            var jobMatches = getAllJobs().filter(function (j) {
+                return j.agency.toLowerCase().indexOf(q) >= 0 || j.title.toLowerCase().indexOf(q) >= 0 || j.cat.toLowerCase().indexOf(q) >= 0;
+            });
+            var topicMatches = READING_TOPICS.filter(function (t) {
+                return t.t.toLowerCase().indexOf(q) >= 0 || t.catTitle.toLowerCase().indexOf(q) >= 0;
+            });
+            var videoMatches = ALL_VIDEOS.filter(function (v) {
+                return v.title.toLowerCase().indexOf(q) >= 0 || v.catTitle.toLowerCase().indexOf(q) >= 0;
+            });
+            var examMatches = PAST_EXAM_SETS.filter(function (e) {
+                return e.title.toLowerCase().indexOf(q) >= 0 || e.catTitle.toLowerCase().indexOf(q) >= 0;
+            });
 
-        var resHtml = '';
-        if (jobMatches.length) {
-            resHtml += '<div class="sb-group-title">📢 ประกาศรับสมัคร (' + jobMatches.length + ')</div>' +
-                jobMatches.map(function (j) { return navLink('#jobs', '📢', j.cat + ' · ' + j.agency, false); }).join('');
-        }
-        if (topicMatches.length) {
-            resHtml += '<div class="sb-group-title">📖 เนื้อหาอ่าน (' + topicMatches.length + ')</div>' +
-                topicMatches.map(function (m) { return navLink('#' + m.k, '📄', m.t, false); }).join('');
-        }
-        if (videoMatches.length) {
-            resHtml += '<div class="sb-group-title">🎬 คลิปติว (' + videoMatches.length + ')</div>' +
-                videoMatches.map(function (v) { return navLink('#videos', '🎬', v.title, false); }).join('');
-        }
-        if (examMatches.length) {
-            resHtml += '<div class="sb-group-title">📜 ข้อสอบเก่า (' + examMatches.length + ')</div>' +
-                examMatches.map(function (e) { return navLink('#past-exams/' + e.id, '📜', e.title, false); }).join('');
-        }
+            var resHtml = '';
+            if (jobMatches.length) {
+                resHtml += '<div class="sb-group-title">📢 ประกาศรับสมัคร (' + jobMatches.length + ')</div>' +
+                    jobMatches.map(function (j) { return navLink('#jobs', '📢', j.cat + ' · ' + j.agency, false); }).join('');
+            }
+            if (topicMatches.length) {
+                resHtml += '<div class="sb-group-title">📖 เนื้อหาอ่าน (' + topicMatches.length + ')</div>' +
+                    topicMatches.map(function (m) { return navLink('#' + m.k, '📄', m.t, false); }).join('');
+            }
+            if (videoMatches.length) {
+                resHtml += '<div class="sb-group-title">🎬 คลิปติว (' + videoMatches.length + ')</div>' +
+                    videoMatches.map(function (v) { return navLink('#videos', '🎬', v.title, false); }).join('');
+            }
+            if (examMatches.length) {
+                resHtml += '<div class="sb-group-title">📜 ข้อสอบเก่า (' + examMatches.length + ')</div>' +
+                    examMatches.map(function (e) { return navLink('#past-exams/' + e.id, '📜', e.title, false); }).join('');
+            }
 
-        $('#nav').innerHTML = resHtml || '<div class="mu" style="padding:10px">ไม่พบหัวข้อที่ค้นหา</div>';
-    };
+            if ($('#nav')) $('#nav').innerHTML = resHtml || '<div class="mu" style="padding:10px">ไม่พบหัวข้อที่ค้นหา</div>';
+        };
+    }
 
-    $('#fa').onclick = function () {
-        P.fs = Math.max(13, (P.fs || 16) - 1);
-        applyPreferences();
-        save();
-    };
+    if ($('#fa')) {
+        $('#fa').onclick = function () {
+            P.fs = Math.max(13, (P.fs || 16) - 1);
+            applyPreferences();
+            save();
+        };
+    }
 
-    $('#fb').onclick = function () {
-        P.fs = Math.min(24, (P.fs || 16) + 1);
-        applyPreferences();
-        save();
-    };
+    if ($('#fb')) {
+        $('#fb').onclick = function () {
+            P.fs = Math.min(24, (P.fs || 16) + 1);
+            applyPreferences();
+            save();
+        };
+    }
 
-    $('#th').onclick = function () {
-        var isDark = document.documentElement.dataset.theme === 'dark' ||
-            (!document.documentElement.dataset.theme && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        P.theme = isDark ? 'light' : 'dark';
-        applyPreferences();
-        save();
-    };
+    if ($('#th')) {
+        $('#th').onclick = function () {
+            var isDark = document.documentElement.dataset.theme === 'dark' ||
+                (!document.documentElement.dataset.theme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            P.theme = isDark ? 'light' : 'dark';
+            applyPreferences();
+            save();
+        };
+    }
 
-    $('#hdr-check').onclick = function () {
-        if (location.hash !== '#home') {
-            location.hash = '#home';
-        }
-        setTimeout(function () {
-            var el = $('#daily-quests-card');
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 60);
-    };
+    if ($('#hdr-check')) {
+        $('#hdr-check').onclick = function () {
+            if (location.hash !== '#home') {
+                location.hash = '#home';
+            }
+            setTimeout(function () {
+                var el = $('#daily-quests-card');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 60);
+        };
+    }
 
-    $('#user-menu-btn').onclick = function (e) {
-        e.stopPropagation();
-        var dd = $('#user-dropdown');
-        dd.hidden = !dd.hidden;
-    };
+    if ($('#user-menu-btn')) {
+        $('#user-menu-btn').onclick = function (e) {
+            e.stopPropagation();
+            var dd = $('#user-dropdown');
+            if (dd) dd.hidden = !dd.hidden;
+        };
+    }
 
     document.addEventListener('click', function (e) {
         var wrap = $('.user-menu-wrap');
-        if (wrap && !wrap.contains(e.target)) {
+        if (wrap && !wrap.contains(e.target) && $('#user-dropdown')) {
             $('#user-dropdown').hidden = true;
         }
     });
 
-    $('#ud-switch').onclick = function () {
-        openAuthScreen();
-    };
-
-    $('#ud-logout').onclick = function () {
-        try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
-        currentUser = null;
-        openAuthScreen();
-    };
-
-    function openDateModal() {
-        $('#user-dropdown').hidden = true;
-        $('#exam-date-input').value = (P && P.examDate) ? P.examDate : '';
-        $('#date-modal').hidden = false;
+    if ($('#ud-switch')) $('#ud-switch').onclick = openAuthScreen;
+    if ($('#ud-logout')) {
+        $('#ud-logout').onclick = function () {
+            try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+            currentUser = null;
+            openAuthScreen();
+        };
     }
 
-    $('#exam-card-btn').onclick = openDateModal;
-    $('#ud-exam-date').onclick = openDateModal;
+    function openDateModal() {
+        if ($('#user-dropdown')) $('#user-dropdown').hidden = true;
+        if ($('#exam-date-input')) $('#exam-date-input').value = (P && P.examDate) ? P.examDate : '';
+        if ($('#date-modal')) $('#date-modal').hidden = false;
+    }
 
-    $('#date-cancel-btn').onclick = function () {
-        $('#date-modal').hidden = true;
-    };
+    if ($('#exam-card-btn')) $('#exam-card-btn').onclick = openDateModal;
+    if ($('#ud-exam-date')) $('#ud-exam-date').onclick = openDateModal;
 
-    $('#date-clear-btn').onclick = function () {
-        P.examDate = '';
-        save();
-        updateCountdownSidebar();
-        $('#date-modal').hidden = true;
-        if ((location.hash || '#home') === '#home') renderDashboard();
-    };
+    if ($('#date-cancel-btn')) {
+        $('#date-cancel-btn').onclick = function () {
+            if ($('#date-modal')) $('#date-modal').hidden = true;
+        };
+    }
 
-    $('#date-save-btn').onclick = function () {
-        P.examDate = $('#exam-date-input').value;
-        save();
-        updateCountdownSidebar();
-        $('#date-modal').hidden = true;
-        if ((location.hash || '#home') === '#home') renderDashboard();
-    };
+    if ($('#date-clear-btn')) {
+        $('#date-clear-btn').onclick = function () {
+            P.examDate = '';
+            save();
+            updateCountdownSidebar();
+            if ($('#date-modal')) $('#date-modal').hidden = true;
+            if ((location.hash || '#home') === '#home') renderDashboard();
+        };
+    }
+
+    if ($('#date-save-btn')) {
+        $('#date-save-btn').onclick = function () {
+            P.examDate = $('#exam-date-input').value;
+            save();
+            updateCountdownSidebar();
+            if ($('#date-modal')) $('#date-modal').hidden = true;
+            if ((location.hash || '#home') === '#home') renderDashboard();
+        };
+    }
 
     /* ----------------------------------------------------------------------
        Bootstrap Application
