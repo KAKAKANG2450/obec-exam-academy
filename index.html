@@ -4,12 +4,15 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
     <title>OBEC Exam Academy — นักวิชาการคอมพิวเตอร์ สพฐ.</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230d9488'/><text x='50' y='68' font-size='52' font-weight='bold' text-anchor='middle' fill='white'>OE</text></svg>">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230d9488'/><text x='50' y='68' font-size='52' font-weight='bold' text-anchor='middle' fill='white'>OE</text></svg>">
 </head>
 
 <body>
@@ -43,8 +46,10 @@
                 <div class="form-group">
                     <label for="auth-pass">รหัสผ่าน / PIN (อย่างน้อย 4 ตัวอักษร) <span class="req">*</span></label>
                     <div class="pass-wrap">
-                        <input id="auth-pass" type="password" placeholder="••••••" required autocomplete="current-password">
-                        <button type="button" id="toggle-pass" class="icon-btn" aria-label="แสดง/ซ่อนรหัสผ่าน">👁️</button>
+                        <input id="auth-pass" type="password" placeholder="••••••" required
+                            autocomplete="current-password">
+                        <button type="button" id="toggle-pass" class="icon-btn"
+                            aria-label="แสดง/ซ่อนรหัสผ่าน">👁️</button>
                     </div>
                 </div>
 
@@ -127,7 +132,8 @@
                     <div class="stat-chip xp" title="คะแนนประสบการณ์สะสม">
                         <span>💎</span><b id="hdr-xp">0</b>
                     </div>
-                    <button type="button" id="hdr-check" class="tool-btn ok-tint" title="ภารกิจวันนี้" aria-label="ภารกิจวันนี้">✓</button>
+                    <button type="button" id="hdr-check" class="tool-btn ok-tint" title="ภารกิจวันนี้"
+                        aria-label="ภารกิจวันนี้">✓</button>
                     <button type="button" id="fa" class="tool-btn" title="ลดขนาดตัวอักษร">Aa−</button>
                     <button type="button" id="fb" class="tool-btn" title="เพิ่มขนาดตัวอักษร">Aa+</button>
                     <button type="button" id="th" class="tool-btn" title="สลับโหมดสว่าง/มืด">🌙</button>
@@ -178,14 +184,13 @@
         </div>
     </div>
 
-    <script>var D = [];</script>
-    <script src="data.js"></script>
-    <script src="past_exams.js"></script>
-    <script src="past_exams_2.js"></script>
-    <script src="study_modules.js"></script>
-    <script src="all_agencies.js"></script>
-    <script src="jobs_board.js"></script>
-    <script src="app.js"></script>
+    <script src="data.js?v=20261119-fix1"></script>
+    <script src="past_exams.js?v=20261119-fix1"></script>
+    <script src="past_exams_2.js?v=20261119-fix1"></script>
+    <script src="study_modules.js?v=20261119-fix1"></script>
+    <script src="all_agencies.js?v=20261119-fix1"></script>
+    <script src="jobs_board.js?v=20261119-fix1"></script> <!-- ต้องมีบรรทัดนี้ -->
+    <script src="app.js?v=20261119-fix1"></script>
 </body>
 
 </html>
