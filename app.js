@@ -1,5 +1,5 @@
 /* ==========================================================================
-   OBEC Exam Academy — Core Application Logic (Bug-Free & Offline-Ready)
+   OBEC Exam Academy — Core Application Logic (Separated 4-Section Architecture)
    ========================================================================== */
 
 (function () {
@@ -66,7 +66,11 @@
     };
 
     /* ----------------------------------------------------------------------
-       Data Indexing (Topics, Quizzes, Flashcards)
+       Data Indexing & Automatic Separation into 4 Parts:
+       1. READING_TOPICS (ส่วนเนื้อหาอ่าน)
+       2. ALL_VIDEOS (ส่วนคลิปติว YouTube)
+       3. CHAPTER_QUIZZES (ส่วนแบบทดสอบท้ายบท)
+       4. PAST_EXAM_SETS & ALL_QUESTIONS (ส่วนข้อสอบเก่า)
        ---------------------------------------------------------------------- */
     var CAT_META = {
         a: { color: '#2563eb', icon: 'ก', short: 'ภาค ก' },
@@ -75,20 +79,98 @@
         d: { color: '#ea580c', icon: 'ค', short: 'ภาค ค' }
     };
 
-    var FLAT_TOPICS = [];
+    var READING_TOPICS = [];
+    var ALL_VIDEOS = [];
+    var CHAPTER_QUIZZES = [];
+    var PAST_EXAM_SETS = [];
     var ALL_QUESTIONS = [];
     var ALL_FLASHCARDS = [];
+
+    function extractVideosFromHtml(htmlStr, cat, sec) {
+        var tmp = document.createElement('div');
+        tmp.innerHTML = htmlStr;
+        var iframes = Array.prototype.slice.call(tmp.querySelectorAll('iframe'));
+        if (!iframes.length) return htmlStr;
+
+        iframes.forEach(function (ifr) {
+            var card = ifr.parentElement && ifr.parentElement.parentElement;
+            if (card && card.parentNode === tmp) {
+                ALL_VIDEOS.push({
+                    catId: cat.id,
+                    catTitle: cat.t,
+                    topicTitle: sec.t,
+                    title: ifr.getAttribute('title') || sec.t,
+                    html: card.outerHTML
+                });
+                card.remove();
+            }
+        });
+
+        // ลบหัวข้อ <h3> ของส่วนวิดีโอที่ไม่มีเนื้อหาตามหลังออก เพื่อไม่ให้ค้างในหน้าอ่าน
+        while (tmp.lastElementChild && tmp.lastElementChild.tagName === 'H3') {
+            tmp.lastElementChild.remove();
+        }
+
+        return tmp.innerHTML.trim();
+    }
 
     D.forEach(function (cat) {
         cat.s.forEach(function (sec, idx) {
             var key = cat.id + '/' + idx;
-            FLAT_TOPICS.push({
-                k: key,
-                c: cat.id,
-                catTitle: cat.t,
-                t: sec.t,
-                idx: idx
+            var pastQuizBlk = null;
+
+            sec.b.forEach(function (blk) {
+                if (blk.k === 'quiz' && String(blk.id || '').indexOf('past_') === 0) {
+                    pastQuizBlk = blk;
+                }
             });
+
+            // แยกชุดข้อสอบเก่า (past_*) ออกจากบทเรียนเนื้อหาอ่าน
+            if (pastQuizBlk) {
+                PAST_EXAM_SETS.push({
+                    id: pastQuizBlk.id,
+                    catId: cat.id,
+                    catTitle: cat.t,
+                    title: sec.t,
+                    blk: pastQuizBlk
+                });
+            } else {
+                var cleanBlocks = [];
+                var chapterQuizBlk = null;
+
+                sec.b.forEach(function (blk) {
+                    if (blk.k === 'h') {
+                        var cleanedHtml = extractVideosFromHtml(blk.v, cat, sec);
+                        if (cleanedHtml) {
+                            cleanBlocks.push({ k: 'h', v: cleanedHtml });
+                        }
+                    } else if (blk.k === 'quiz') {
+                        chapterQuizBlk = blk;
+                        CHAPTER_QUIZZES.push({
+                            id: blk.id,
+                            catId: cat.id,
+                            catTitle: cat.t,
+                            topicKey: key,
+                            topicTitle: sec.t,
+                            blk: blk
+                        });
+                    } else {
+                        cleanBlocks.push(blk);
+                    }
+                });
+
+                READING_TOPICS.push({
+                    k: key,
+                    c: cat.id,
+                    catTitle: cat.t,
+                    t: sec.t,
+                    idx: idx,
+                    cleanBlocks: cleanBlocks,
+                    quizBlk: chapterQuizBlk
+                });
+            }
+
+            // รวมข้อสอบและ Flashcards ทั้งหมดเข้าคลังกลาง
             sec.b.forEach(function (blk) {
                 if (blk.k === 'quiz' && Array.isArray(blk.qs)) {
                     blk.qs.forEach(function (q, qIdx) {
@@ -132,7 +214,7 @@
 
     function defaultProgress() {
         return {
-            v: {},          // บทเรียนที่เรียนจบแล้ว { "a/0": 1 }
+            completed: {},  // บทเรียนที่อ่าน/ผ่านแล้ว { "a/0": 1 }
             qz: {},         // คะแนนล่าสุดรายชุด { "a0": { score: 3, total: 4 } }
             qLog: {},       // ประวัติการตอบรายข้อ { "a0_0": true/false }
             mistakes: [],   // รายการข้อที่เคยตอบผิด [uid, ...]
@@ -156,7 +238,8 @@
         var base = defaultProgress();
         if (!raw || typeof raw !== 'object') return base;
         var merged = Object.assign(base, raw);
-        merged.v = merged.v || {};
+        merged.completed = merged.completed || {};
+        delete merged.v;
         merged.qz = merged.qz || {};
         merged.qLog = merged.qLog || {};
         merged.mistakes = Array.isArray(merged.mistakes) ? merged.mistakes : [];
@@ -223,7 +306,6 @@
         store.set(SESSION_KEY, { email: userObj.email });
         P = normalizeProgress(store.get(userDataKey(userObj.email), null));
 
-        // เช็คว่าถ้าเมื่อวานไม่ได้เข้าเรียนและวันนี้ยังไม่เริ่ม ให้รีเซ็ต streak แสดงผลเป็น 0
         var tk = todayKey();
         var yk = yesterdayKey();
         if (!P.activeDays[tk] && !P.activeDays[yk]) {
@@ -436,7 +518,7 @@
         var prev = P.qz[blk.id];
 
         container.innerHTML =
-            '<h3>📝 แบบทดสอบเช็กความเข้าใจ ' +
+            '<h3>📝 แบบทดสอบ ' +
             (prev ? '<span class="mu">(คะแนนล่าสุด ' + prev.score + '/' + prev.total + ')</span>' : '') +
             '</h3><div id="qz-sum-' + esc(blk.id) + '"></div>';
 
@@ -485,11 +567,10 @@
                         var passed = pct >= 80 ? 1 : 0;
                         P.qz[blk.id] = { score: score, total: total };
 
-                        // บันทึกว่าเรียนจบบทนี้เฉพาะเมื่อทำแบบทดสอบผ่านเกณฑ์ ≥ 80%
-                        if (passed && topicKey && !P.v[topicKey]) {
-                            P.v[topicKey] = 1;
+                        if (passed && topicKey && !P.completed[topicKey]) {
+                            P.completed[topicKey] = 1;
                             recordActivity(10, 0, 0);
-                            renderSidebar(topicKey);
+                            renderSidebar(location.hash.replace(/^#/, '') || 'home');
                         }
 
                         recordActivity(passed ? 15 : 5, 0, passed);
@@ -500,7 +581,7 @@
                                 '<div class="quiz-summary">' +
                                 (passed ? '🎉 ยอดเยี่ยม! ผ่านเกณฑ์ ' : '📌 สรุปผล: ') +
                                 'ได้ ' + score + ' / ' + total + ' คะแนน (' + pct + '%)' +
-                                (passed ? ' · บันทึกจบบทเรียน & รับโบนัส +15 XP' : ' · ต้องได้ ≥ 80% เพื่อบันทึกจบบทนี้') +
+                                (passed ? ' · รับโบนัส +15 XP' : ' · เป้าหมาย ≥ 80%') +
                                 '</div>';
                         }
                     }
@@ -633,7 +714,7 @@
     }
 
     /* ----------------------------------------------------------------------
-       Sidebar & Mobile Tabs Navigation
+       Sidebar & Mobile Tabs Navigation (4 Separated Sections)
        ---------------------------------------------------------------------- */
     function renderSidebar(currentRoute) {
         var catIcons = { a: '📐', b: '⚖️', c: '💻', d: '🎓' };
@@ -641,36 +722,44 @@
 
         html += '<div class="sb-group-title">ภาพรวม</div>';
         html += navLink('#home', '⊞', 'Dashboard', currentRoute === 'home');
-        html += navLink('#d/0', '📝', 'แนวข้อสอบสัมภาษณ์ & นโยบาย', currentRoute === 'd/0');
 
-        html += '<div class="sb-group-title">เนื้อหา 4 หมวด</div>';
+        html += '<div class="sb-group-title">1. ส่วนเนื้อหาอ่าน</div>';
         D.forEach(function (cat) {
-            var doneCount = cat.s.filter(function (_, i) { return !!P.v[cat.id + '/' + i]; }).length;
+            var catTopics = READING_TOPICS.filter(function (t) { return t.c === cat.id; });
+            var doneCount = catTopics.filter(function (t) { return !!P.completed[t.k]; }).length;
             var isCatActive = currentRoute.indexOf(cat.id + '/') === 0;
+            var firstTopicHref = catTopics.length ? ('#' + catTopics[0].k) : '#home';
+
             html += navLink(
-                '#' + cat.id + '/0',
+                firstTopicHref,
                 catIcons[cat.id] || '📘',
                 cat.t,
                 isCatActive,
-                doneCount + '/' + cat.s.length
+                doneCount + '/' + catTopics.length
             );
+
             if (isCatActive) {
-                cat.s.forEach(function (sec, idx) {
-                    var k = cat.id + '/' + idx;
-                    var seenMark = P.v[k] ? '✓' : '•';
+                catTopics.forEach(function (topic) {
                     html +=
-                        '<a href="#' + k + '" class="nav-item ' + (currentRoute === k ? 'active' : '') + '" style="padding-left:28px;font-size:0.84em">' +
-                        '<span class="nav-ic" style="font-size:0.85em;color:' + (P.v[k] ? 'var(--ok)' : 'var(--mu)') + '">' + seenMark + '</span>' +
-                        '<span class="nav-text">' + esc(sec.t) + '</span>' +
+                        '<a href="#' + topic.k + '" class="nav-item ' + (currentRoute === topic.k ? 'active' : '') + '" style="padding-left:28px;font-size:0.84em">' +
+                        '<span class="nav-ic" style="font-size:0.85em;color:var(--mu)">•</span>' +
+                        '<span class="nav-text">' + esc(topic.t) + '</span>' +
                         '</a>';
                 });
             }
         });
 
-        html += '<div class="sb-group-title">ฝึกทำข้อสอบ</div>';
-        html += navLink('#qbank', '📚', 'Question Bank', currentRoute === 'qbank', ALL_QUESTIONS.length);
+        html += '<div class="sb-group-title">2. ส่วนคลิปติว</div>';
+        html += navLink('#videos', '🎬', 'คลิปติว YouTube', currentRoute === 'videos', ALL_VIDEOS.length);
+
+        html += '<div class="sb-group-title">3. ส่วนแบบทดสอบ</div>';
+        html += navLink('#quizzes', '📝', 'แบบทดสอบท้ายบท', currentRoute.indexOf('quizzes') === 0, CHAPTER_QUIZZES.length);
         html += navLink('#flashcards', '🗂️', 'Flashcards Deck', currentRoute === 'flashcards', ALL_FLASHCARDS.length);
-        html += navLink('#mock', '⏱️', 'Mock Exam', currentRoute === 'mock');
+
+        html += '<div class="sb-group-title">4. ส่วนคลังข้อสอบ</div>';
+        html += navLink('#past-exams', '📜', 'ข้อสอบเก่าแยกชุด', currentRoute.indexOf('past-exams') === 0, PAST_EXAM_SETS.length);
+        html += navLink('#qbank', '📚', 'Question Bank รวม', currentRoute === 'qbank', ALL_QUESTIONS.length);
+        html += navLink('#mock', '⏱️', 'Mock Exam (สุ่มสอบ)', currentRoute === 'mock');
         html += navLink('#mistakes', '🔄', 'Review Mistakes', currentRoute === 'mistakes', P.mistakes.length);
 
         html += '<div class="sb-group-title">ติดตามผล</div>';
@@ -691,12 +780,13 @@
     }
 
     function renderMobileTabs(currentRoute) {
+        var firstTopic = READING_TOPICS[0] ? ('#' + READING_TOPICS[0].k) : '#home';
         var items = [
-            { href: '#home', ic: '🏠', label: 'Dashboard', on: currentRoute === 'home' },
-            { href: '#a/0', ic: '📘', label: 'บทเรียน', on: /^[abcd]\//.test(currentRoute) },
-            { href: '#qbank', ic: '📝', label: 'ฝึกข้อสอบ', on: currentRoute === 'qbank' || currentRoute === 'mock' },
-            { href: '#mistakes', ic: '🔄', label: 'ทบทวนผิด', on: currentRoute === 'mistakes' },
-            { href: '#prog', ic: '📊', label: 'Progress', on: currentRoute === 'prog' }
+            { href: '#home', ic: '🏠', label: 'หน้าหลัก', on: currentRoute === 'home' },
+            { href: firstTopic, ic: '📖', label: 'เนื้อหา', on: /^[abcd]\//.test(currentRoute) },
+            { href: '#videos', ic: '🎬', label: 'คลิปติว', on: currentRoute === 'videos' },
+            { href: '#quizzes', ic: '📝', label: 'แบบทดสอบ', on: currentRoute.indexOf('quizzes') === 0 },
+            { href: '#past-exams', ic: '📜', label: 'ข้อสอบเก่า', on: currentRoute.indexOf('past-exams') === 0 || currentRoute === 'qbank' || currentRoute === 'mock' }
         ];
         $('#tabs').innerHTML = items.map(function (it) {
             return '<a href="' + it.href + '" class="' + (it.on ? 'active' : '') + '"><b>' + it.ic + '</b><span>' + it.label + '</span></a>';
@@ -709,11 +799,10 @@
     function renderDashboard() {
         $('#page-title').textContent = 'Dashboard';
 
-        var totalTopics = FLAT_TOPICS.length || 1;
-        var readTopics = FLAT_TOPICS.filter(function (t) { return !!P.v[t.k]; });
-        var nextTopic = FLAT_TOPICS.filter(function (t) { return !P.v[t.k]; })[0] || FLAT_TOPICS[0];
-        var nextCatIndex = nextTopic ? (nextTopic.idx + 1) : 1;
-        var nextCatCode = nextTopic ? (CAT_META[nextTopic.c].short + ' · บทที่ ' + nextCatIndex) : '';
+        var totalTopics = READING_TOPICS.length || 1;
+        var readTopics = READING_TOPICS.filter(function (t) { return !!P.completed[t.k]; });
+        var nextTopic = READING_TOPICS.filter(function (t) { return !P.completed[t.k]; })[0] || READING_TOPICS[0];
+        var nextCatCode = nextTopic ? CAT_META[nextTopic.c].short : '';
 
         var cd = getCountdownInfo();
         var countdownHtml = cd
@@ -742,9 +831,11 @@
 
         var catCardsHtml = D.map(function (cat) {
             var meta = CAT_META[cat.id];
-            var totalSec = cat.s.length;
-            var doneSec = cat.s.filter(function (_, i) { return !!P.v[cat.id + '/' + i]; }).length;
+            var catTopics = READING_TOPICS.filter(function (t) { return t.c === cat.id; });
+            var totalSec = catTopics.length;
+            var doneSec = catTopics.filter(function (t) { return !!P.completed[t.k]; }).length;
             var pctSec = Math.round((doneSec / (totalSec || 1)) * 100);
+            var firstHref = catTopics.length ? ('#' + catTopics[0].k) : '#home';
 
             var catQs = ALL_QUESTIONS.filter(function (q) { return q.catId === cat.id; });
             var answeredCatQs = catQs.filter(function (q) { return P.qLog[q.uid] !== undefined; });
@@ -754,11 +845,11 @@
                 : '–';
 
             return (
-                '<a href="#' + cat.id + '/0" class="cat-card" style="--cat-color:' + meta.color + '">' +
+                '<a href="' + firstHref + '" class="cat-card" style="--cat-color:' + meta.color + '">' +
                 '<div class="cat-icon-box">' + esc(meta.icon) + '</div>' +
                 '<div class="cat-title">' + esc(cat.t) + '</div>' +
                 '<div class="prog-track"><div class="prog-fill" style="width:' + pctSec + '%;background:' + meta.color + '"></div></div>' +
-                '<div class="cat-stats">ผ่าน ' + doneSec + '/' + totalSec + ' บท · แม่นยำ ' + accText + '</div>' +
+                '<div class="cat-stats">อ่านแล้ว ' + doneSec + '/' + totalSec + ' บท · แม่นยำ ' + accText + '</div>' +
                 '</a>'
             );
         }).join('');
@@ -796,26 +887,43 @@
             '      ' + heroSvg +
             '      <div class="hero-body">' +
             '        <h1>วันนี้ขอแค่ 30 นาที</h1>' +
-            '        <p>อ่านทีละส่วนสั้น ๆ ตอบคำถามเช็กความเข้าใจ แล้วปิดบทด้วยแบบทดสอบให้ได้ 80% ขึ้นไป</p>' +
+            '        <p>แยกส่วนอ่านเนื้อหา ดูคลิปติว ทำแบบทดสอบท้ายบท และตะลุยคลังข้อสอบเก่า 154 ข้อได้อย่างเป็นระบบ</p>' +
             '        <div class="countdown-box" id="hero-countdown-btn" title="คลิกเพื่อตั้งวันสอบ">' +
             '          ' + countdownHtml +
             '        </div>' +
             '        <div class="hero-actions">' +
-            '          <a href="#' + nextTopic.k + '" class="btn-primary">' + (readTopics.length ? 'เริ่มบทถัดไป' : 'เริ่มเรียนบทแรก') + '</a>' +
-            '          <a href="#mock" class="btn-outline">ข้อสอบจำลอง</a>' +
+            '          <a href="#' + nextTopic.k + '" class="btn-primary">📖 อ่านเนื้อหาต่อ</a>' +
+            '          <a href="#videos" class="btn-outline">🎬 คลิปติว (' + ALL_VIDEOS.length + ')</a>' +
+            '          <a href="#quizzes" class="btn-outline">📝 แบบทดสอบ</a>' +
+            '          <a href="#past-exams" class="btn-outline">📜 ข้อสอบเก่า</a>' +
             '        </div>' +
             '      </div>' +
             '    </div>' +
 
-            '    <!-- 2. Highlight Banner -->' +
-            '    <a href="#c/0" class="highlight-banner">' +
-            '      <div class="hb-icon">🎯</div>' +
-            '      <div class="hb-text">' +
-            '        <div class="hb-title">จุดเน้นออกสอบบ่อย: พ.ร.บ.คอมพิวเตอร์ · PDPA · SQL &amp; คำนวณ Subnet</div>' +
-            '        <div class="hb-sub">รวมตารางมาตราสำคัญ ตัวอย่าง Query และเครื่องคำนวณ Subnet ฝึกใช้ให้คล่องก่อนเข้าห้องสอบ</div>' +
-            '      </div>' +
-            '      <div style="color:var(--mu);font-weight:800">›</div>' +
-            '    </a>' +
+            '    <!-- 2. Quick Access 4 Separated Sections -->' +
+            '    <div class="section-heading">ทางลัดเข้าใช้งาน 4 ส่วนหลัก</div>' +
+            '    <div class="cat-grid">' +
+            '      <a href="#' + nextTopic.k + '" class="cat-card" style="--cat-color:#2563eb">' +
+            '        <div class="cat-icon-box">📖</div>' +
+            '        <div class="cat-title">1. ส่วนเนื้อหาอ่าน</div>' +
+            '        <div class="cat-stats">บทสรุป &amp; ตารางจุดออกสอบ (' + READING_TOPICS.length + ' บท)</div>' +
+            '      </a>' +
+            '      <a href="#videos" class="cat-card" style="--cat-color:#dc2626">' +
+            '        <div class="cat-icon-box">🎬</div>' +
+            '        <div class="cat-title">2. ส่วนคลิปติว YouTube</div>' +
+            '        <div class="cat-stats">รวมคลิปติวแยกตามหมวด (' + ALL_VIDEOS.length + ' คลิป)</div>' +
+            '      </a>' +
+            '      <a href="#quizzes" class="cat-card" style="--cat-color:#0d9488">' +
+            '        <div class="cat-icon-box">📝</div>' +
+            '        <div class="cat-title">3. ส่วนแบบทดสอบท้ายบท</div>' +
+            '        <div class="cat-stats">เช็กความเข้าใจแยกตามบท (' + CHAPTER_QUIZZES.length + ' ชุด)</div>' +
+            '      </a>' +
+            '      <a href="#past-exams" class="cat-card" style="--cat-color:#7c3aed">' +
+            '        <div class="cat-icon-box">📜</div>' +
+            '        <div class="cat-title">4. ส่วนคลังข้อสอบเก่า</div>' +
+            '        <div class="cat-stats">ข้อสอบเก่า ' + PAST_EXAM_SETS.length + ' ชุด (รวม ' + ALL_QUESTIONS.length + ' ข้อ)</div>' +
+            '      </a>' +
+            '    </div>' +
 
             '    <!-- 3. Next Lesson Card -->' +
             '    <div class="card continue-card">' +
@@ -824,19 +932,18 @@
             '        <div class="cont-tag">' + esc(nextTopic.catTitle) + ' · ' + esc(nextCatCode) + '</div>' +
             '        <div class="cont-title">' + esc(nextTopic.t) + '</div>' +
             '        <div class="prog-track"><div class="prog-fill" style="width:' + overallPct + '%"></div></div>' +
-            '        <div class="cont-meta">ภาพรวมผ่านแล้ว ' + overallPct + '% (' + readTopics.length + '/' + totalTopics + ' บท) · ~10 นาทีต่อบท</div>' +
+            '        <div class="cont-meta">อ่านเนื้อหาแล้ว ' + overallPct + '% (' + readTopics.length + '/' + totalTopics + ' บท)</div>' +
             '      </div>' +
-            '      <a href="#' + nextTopic.k + '" class="btn-primary">เริ่มเรียน</a>' +
+            '      <a href="#' + nextTopic.k + '" class="btn-primary">เริ่มอ่าน</a>' +
             '    </div>' +
 
             '    <!-- 4. Categories Grid -->' +
-            '    <div class="section-heading">4 หมวด · สนามสอบนักวิชาการคอมพิวเตอร์ สพฐ.</div>' +
+            '    <div class="section-heading">เนื้อหาอ่านแยกตาม 4 หมวดสอบ</div>' +
             '    <div class="cat-grid">' + catCardsHtml + '</div>' +
             '  </div>' +
 
             '  <!-- Right Column Widgets -->' +
             '  <div class="dash-side">' +
-            '    <!-- Streak Card -->' +
             '    <div class="card">' +
             '      <div class="streak-top">' +
             '        <div class="flame-big">🔥</div>' +
@@ -848,7 +955,6 @@
             '      <div class="week-row">' + weekDotsHtml + '</div>' +
             '    </div>' +
 
-            '    <!-- Level & XP Card -->' +
             '    <div class="card">' +
             '      <div class="level-header">' +
             '        <div class="level-title">เลเวล ' + level + '</div>' +
@@ -858,10 +964,8 @@
             '      <div class="level-sub">อีก ' + xpNeeded + ' XP ถึงเลเวล ' + (level + 1) + '</div>' +
             '    </div>' +
 
-            '    <!-- Daily Quests Card -->' +
             '    <div class="card" id="daily-quests-card">' +
             '      <div class="quests-title">ภารกิจวันนี้</div>' +
-
             '      <div class="quest-item">' +
             '        <div class="quest-ic q1">⚡</div>' +
             '        <div class="quest-body">' +
@@ -872,7 +976,6 @@
             '          </div>' +
             '        </div>' +
             '      </div>' +
-
             '      <div class="quest-item">' +
             '        <div class="quest-ic q2">🎯</div>' +
             '        <div class="quest-body">' +
@@ -883,11 +986,10 @@
             '          </div>' +
             '        </div>' +
             '      </div>' +
-
             '      <div class="quest-item">' +
             '        <div class="quest-ic q3">🏆</div>' +
             '        <div class="quest-body">' +
-            '          <div class="quest-name">ผ่านแบบทดสอบ 1 บท (≥ 80%)</div>' +
+            '          <div class="quest-name">ผ่านแบบทดสอบ 1 ชุด (≥ 80%)</div>' +
             '          <div class="quest-bar-wrap">' +
             '            <div class="quest-bar-fill" style="width:' + Math.round((q3Cur / 1) * 100) + '%"></div>' +
             '            <div class="quest-bar-text">' + q3Cur + '/1</div>' +
@@ -902,31 +1004,32 @@
     }
 
     /* ----------------------------------------------------------------------
-       Lesson Page View
+       1. Reading Lesson Page View (เฉพาะส่วนเนื้อหาอ่าน + ตาราง + Flashcards)
        ---------------------------------------------------------------------- */
     function renderLessonPage(catId, secIdx) {
-        var cat = D.filter(function (x) { return x.id === catId; })[0];
-        if (!cat || !cat.s[secIdx]) {
+        var topicKey = catId + '/' + secIdx;
+        var topic = READING_TOPICS.filter(function (x) { return x.k === topicKey; })[0];
+        if (!topic) {
             renderDashboard();
             return;
         }
-        var sec = cat.s[secIdx];
-        var topicKey = catId + '/' + secIdx;
         var meta = CAT_META[catId] || { color: 'var(--pr)' };
+        var catTopics = READING_TOPICS.filter(function (x) { return x.c === catId; });
+        var posInCat = catTopics.findIndex(function (x) { return x.k === topicKey; });
 
-        $('#page-title').textContent = sec.t;
+        $('#page-title').textContent = topic.t;
         var mainEl = $('#main');
         mainEl.style.setProperty('--cc', meta.color);
         mainEl.innerHTML =
             '<div class="lesson-wrap" id="lesson-wrap">' +
             '  <div class="card lesson-header-card">' +
-            '    <div class="mu">' + esc(cat.t) + ' · บทที่ ' + (secIdx + 1) + '/' + cat.s.length + '</div>' +
-            '    <h1>' + esc(sec.t) + '</h1>' +
+            '    <div class="mu">📖 ส่วนเนื้อหาอ่าน · ' + esc(topic.catTitle) + ' · บทที่ ' + (posInCat + 1) + '/' + catTopics.length + '</div>' +
+            '    <h1>' + esc(topic.t) + '</h1>' +
             '  </div>' +
             '</div>';
 
         var wrap = $('#lesson-wrap');
-        sec.b.forEach(function (blk) {
+        topic.cleanBlocks.forEach(function (blk) {
             var card = document.createElement('div');
             card.className = 'card';
             wrap.appendChild(card);
@@ -935,8 +1038,6 @@
                 card.innerHTML = blk.v;
             } else if (blk.k === 't') {
                 card.innerHTML = renderTable(blk.h, blk.r);
-            } else if (blk.k === 'quiz') {
-                renderQuizBlock(card, blk, topicKey);
             } else if (blk.k === 'fc') {
                 renderFlashcardBlock(card, blk);
             }
@@ -949,53 +1050,233 @@
             }
         });
 
-        // กรณีบทเรียนไม่มีแบบทดสอบ ให้แสดงปุ่มกดยืนยันว่าอ่านจบบทนี้แล้ว
-        var hasQuiz = sec.b.some(function (blk) { return blk.k === 'quiz'; });
-        if (!hasQuiz) {
-            var isDone = !!P.v[topicKey];
-            wrap.insertAdjacentHTML(
-                'beforeend',
-                '<div class="card" style="text-align:center">' +
-                '<button type="button" id="btn-mark-done" class="' + (isDone ? 'btn-outline' : 'btn-primary') + '">' +
-                (isDone ? '✅ เรียนจบบทนี้แล้ว' : '✔ บันทึกว่าอ่านจบบทนี้ (+10 XP)') +
-                '</button>' +
-                '</div>'
-            );
+        // แถบควบคุมท้ายบทเรียน: บันทึกว่าอ่านจบ + ปุ่มลัดไปทำแบบทดสอบท้ายบท / ดูคลิปติว
+        var isDone = !!P.completed[topicKey];
+        var actionHtml =
+            '<div class="card" style="text-align:center">' +
+            '  <div class="row" style="justify-content:center;gap:10px;flex-wrap:wrap">' +
+            '    <button type="button" id="btn-mark-done" class="' + (isDone ? 'btn-outline' : 'btn-primary') + '">' +
+            (isDone ? '✅ อ่านจบบทนี้แล้ว' : '✔ บันทึกว่าอ่านจบบทนี้ (+10 XP)') +
+            '    </button>';
 
-            var doneBtn = $('#btn-mark-done');
-            if (doneBtn) {
-                doneBtn.onclick = function () {
-                    if (!P.v[topicKey]) {
-                        P.v[topicKey] = 1;
-                        recordActivity(10, 0, 0);
-                        renderSidebar(topicKey);
-                        doneBtn.className = 'btn-outline';
-                        doneBtn.textContent = '✅ เรียนจบบทนี้แล้ว';
-                    }
-                };
-            }
+        if (topic.quizBlk) {
+            actionHtml +=
+                '    <a href="#quizzes/' + esc(topic.quizBlk.id) + '" class="btn-outline">📝 ทำแบบทดสอบท้ายบทนี้ (' + topic.quizBlk.qs.length + ' ข้อ) →</a>';
+        }
+        actionHtml +=
+            '    <a href="#videos" class="btn-outline">🎬 ดูคลิปติว YouTube</a>' +
+            '  </div>' +
+            '</div>';
+
+        wrap.insertAdjacentHTML('beforeend', actionHtml);
+
+        var doneBtn = $('#btn-mark-done');
+        if (doneBtn) {
+            doneBtn.onclick = function () {
+                if (!P.completed[topicKey]) {
+                    P.completed[topicKey] = 1;
+                    recordActivity(10, 0, 0);
+                    renderSidebar(topicKey);
+                    doneBtn.className = 'btn-outline';
+                    doneBtn.textContent = '✅ อ่านจบบทนี้แล้ว';
+                }
+            };
         }
 
-        // ปุ่มก่อนหน้า / ถัดไป
-        var flatIdx = FLAT_TOPICS.findIndex(function (x) { return x.k === topicKey; });
-        var prevT = flatIdx > 0 ? FLAT_TOPICS[flatIdx - 1] : null;
-        var nextT = flatIdx < FLAT_TOPICS.length - 1 ? FLAT_TOPICS[flatIdx + 1] : null;
+        // ปุ่มก่อนหน้า / ถัดไป เฉพาะในหมวดเนื้อหาอ่าน
+        var flatIdx = READING_TOPICS.findIndex(function (x) { return x.k === topicKey; });
+        var prevT = flatIdx > 0 ? READING_TOPICS[flatIdx - 1] : null;
+        var nextT = flatIdx < READING_TOPICS.length - 1 ? READING_TOPICS[flatIdx + 1] : null;
 
         wrap.insertAdjacentHTML(
             'beforeend',
             '<div class="pager">' +
-            (prevT ? '<a href="#' + prevT.k + '"><small>◀ บทก่อนหน้า</small>' + esc(prevT.t) + '</a>' : '<span></span>') +
-            (nextT ? '<a href="#' + nextT.k + '"><small>บทถัดไป ▶</small>' + esc(nextT.t) + '</a>' : '<a href="#home"><small>เรียนครบทุกบทแล้ว 🎉</small>กลับหน้า Dashboard</a>') +
+            (prevT ? '<a href="#' + prevT.k + '"><small>◀ เนื้อหาก่อนหน้า</small>' + esc(prevT.t) + '</a>' : '<span></span>') +
+            (nextT ? '<a href="#' + nextT.k + '"><small>เนื้อหาถัดไป ▶</small>' + esc(nextT.t) + '</a>' : '<a href="#quizzes"><small>อ่านครบทุกบทแล้ว 🎉</small>ไปทำแบบทดสอบท้ายบท →</a>') +
             '</div>'
         );
     }
 
     /* ----------------------------------------------------------------------
-       Question Bank / Mock Exam / Review Mistakes / Flashcards Deck
+       2. Video Tutorials Hub View (ส่วนคลิปติว YouTube แยกหมวด)
        ---------------------------------------------------------------------- */
+    function renderVideosPage() {
+        $('#page-title').textContent = 'คลิปติว YouTube';
+        var selectedCat = 'all';
+
+        function draw() {
+            var filtered = (selectedCat === 'all')
+                ? ALL_VIDEOS
+                : ALL_VIDEOS.filter(function (v) { return v.catId === selectedCat; });
+
+            var filterBtns =
+                '<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:12px">' +
+                '<button type="button" class="' + (selectedCat === 'all' ? 'btn-primary' : 'btn-outline') + '" data-vcat="all">ทั้งหมด (' + ALL_VIDEOS.length + ')</button>' +
+                D.map(function (c) {
+                    var cnt = ALL_VIDEOS.filter(function (v) { return v.catId === c.id; }).length;
+                    return '<button type="button" class="' + (selectedCat === c.id ? 'btn-primary' : 'btn-outline') + '" data-vcat="' + c.id + '">' + esc(CAT_META[c.id].short) + ' (' + cnt + ')</button>';
+                }).join('') +
+                '</div>';
+
+            var cardsHtml = filtered.map(function (v) {
+                var meta = CAT_META[v.catId] || { short: '' };
+                return (
+                    '<div class="card">' +
+                    '  <div class="mu" style="font-size:0.85em;margin-bottom:4px">🏷️ ' + esc(meta.short) + ' · ' + esc(v.catTitle) + '</div>' +
+                    v.html +
+                    '</div>'
+                );
+            }).join('');
+
+            $('#main').innerHTML =
+                '<div class="lesson-wrap">' +
+                '  <div class="card">' +
+                '    <h1>🎬 ส่วนคลิปติว YouTube (รวมทุกหมวด)</h1>' +
+                '    <p class="mu" style="margin:0">เลือกดูคลิปติวสรุปและเฉลยข้อสอบแยกตามหมวดวิชาได้ทันที</p>' +
+                filterBtns +
+                '  </div>' +
+                (cardsHtml || '<div class="card"><p class="mu" style="text-align:center">ยังไม่มีวิดีโอในหมวดนี้</p></div>') +
+                '</div>';
+
+            $$('[data-vcat]').forEach(function (btn) {
+                btn.onclick = function () {
+                    selectedCat = btn.dataset.vcat;
+                    draw();
+                };
+            });
+        }
+
+        draw();
+    }
+
+    /* ----------------------------------------------------------------------
+       3. Chapter Quizzes Hub & Runner (ส่วนแบบทดสอบท้ายบท แยกจากเนื้อหา)
+       ---------------------------------------------------------------------- */
+    function renderQuizSetListPage(options) {
+        $('#page-title').textContent = options.pageTitle;
+        var selectedCat = 'all';
+
+        function draw() {
+            var filtered = (selectedCat === 'all')
+                ? options.sets
+                : options.sets.filter(function (s) { return s.catId === selectedCat; });
+
+            var filterBtns =
+                '<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:12px">' +
+                '<button type="button" class="' + (selectedCat === 'all' ? 'btn-primary' : 'btn-outline') + '" data-qcat="all">ทั้งหมด (' + options.sets.length + ' ชุด)</button>' +
+                D.map(function (c) {
+                    var cnt = options.sets.filter(function (s) { return s.catId === c.id; }).length;
+                    return '<button type="button" class="' + (selectedCat === c.id ? 'btn-primary' : 'btn-outline') + '" data-qcat="' + c.id + '">' + esc(CAT_META[c.id].short) + ' (' + cnt + ')</button>';
+                }).join('') +
+                '</div>';
+
+            var listHtml = filtered.map(function (s) {
+                var meta = CAT_META[s.catId] || { short: '', color: 'var(--pr)' };
+                var prev = P.qz[s.id];
+                var qCount = s.blk.qs.length;
+                var statusBadge = prev
+                    ? '<span style="color:var(--ok);font-weight:700">✔ ล่าสุด ' + prev.score + '/' + prev.total + ' (' + Math.round((prev.score / prev.total) * 100) + '%)</span>'
+                    : '<span class="mu">ยังไม่เคยทำ</span>';
+
+                return (
+                    '<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">' +
+                    '  <div style="flex:1;min-width:220px">' +
+                    '    <div class="mu" style="font-size:0.85em">🏷️ ' + esc(meta.short) + ' · ' + esc(s.catTitle) + '</div>' +
+                    '    <div style="font-weight:700;font-size:1.05em;margin:4px 0">' + esc(s.title || s.topicTitle) + '</div>' +
+                    '    <div style="font-size:0.88em">จำนวน <b>' + qCount + '</b> ข้อ · ' + statusBadge + '</div>' +
+                    '  </div>' +
+                    '  <div class="row" style="gap:8px">' +
+                    (s.topicKey ? '<a href="#' + esc(s.topicKey) + '" class="btn-outline">📖 อ่านเนื้อหา</a>' : '') +
+                    '    <a href="#' + options.routePrefix + '/' + esc(s.id) + '" class="btn-primary">' + (prev ? 'ทำใหม่อีกครั้ง →' : 'เริ่มทำชุดนี้ →') + '</a>' +
+                    '  </div>' +
+                    '</div>'
+                );
+            }).join('');
+
+            $('#main').innerHTML =
+                '<div class="lesson-wrap">' +
+                '  <div class="card">' +
+                '    <h1>' + esc(options.headerTitle) + '</h1>' +
+                '    <p class="mu" style="margin:0">' + esc(options.subtitle) + '</p>' +
+                (options.extraBanner || '') +
+                filterBtns +
+                '  </div>' +
+                (listHtml || '<div class="card"><p class="mu" style="text-align:center">ยังไม่มีชุดข้อสอบในหมวดนี้</p></div>') +
+                '</div>';
+
+            $$('[data-qcat]').forEach(function (btn) {
+                btn.onclick = function () {
+                    selectedCat = btn.dataset.qcat;
+                    draw();
+                };
+            });
+        }
+
+        draw();
+    }
+
+    function renderSingleQuizSet(setObj, backHref, backLabel) {
+        var title = setObj.title || setObj.topicTitle;
+        $('#page-title').textContent = title;
+        $('#main').innerHTML =
+            '<div class="lesson-wrap">' +
+            '  <div class="card">' +
+            '    <div style="margin-bottom:8px"><a href="' + backHref + '" style="font-weight:600;color:var(--pr)">← ' + esc(backLabel) + '</a></div>' +
+            '    <div class="mu">' + esc(setObj.catTitle) + ' · จำนวน ' + setObj.blk.qs.length + ' ข้อ</div>' +
+            '    <h1>' + esc(title) + '</h1>' +
+            '  </div>' +
+            '  <div class="card" id="single-quiz-host"></div>' +
+            '</div>';
+
+        renderQuizBlock($('#single-quiz-host'), setObj.blk, setObj.topicKey || null);
+    }
+
+    function renderQuizzesHub(quizId) {
+        if (quizId) {
+            var found = CHAPTER_QUIZZES.filter(function (q) { return q.id === quizId; })[0];
+            if (found) {
+                renderSingleQuizSet(found, '#quizzes', 'กลับหน้ารวมแบบทดสอบท้ายบท');
+                return;
+            }
+        }
+        renderQuizSetListPage({
+            pageTitle: 'แบบทดสอบท้ายบท',
+            headerTitle: '📝 ส่วนแบบทดสอบท้ายบท (แยกตามเรื่อง)',
+            subtitle: 'เลือกทำแบบทดสอบเช็กความเข้าใจทีละหัวข้อ (ทำได้ ≥ 80% ระบบจะบันทึกว่าผ่านบทนั้นอัตโนมัติ)',
+            sets: CHAPTER_QUIZZES,
+            routePrefix: 'quizzes'
+        });
+    }
+
+    /* ----------------------------------------------------------------------
+       4. Past Exams Hub & Question Bank / Mock Exam / Review Mistakes
+       ---------------------------------------------------------------------- */
+    function renderPastExamsHub(examId) {
+        if (examId) {
+            var found = PAST_EXAM_SETS.filter(function (e) { return e.id === examId; })[0];
+            if (found) {
+                renderSingleQuizSet(found, '#past-exams', 'กลับหน้ารวมคลังข้อสอบเก่า');
+                return;
+            }
+        }
+        renderQuizSetListPage({
+            pageTitle: 'ข้อสอบเก่าแยกชุด',
+            headerTitle: '📜 ส่วนคลังข้อสอบเก่า & แนวข้อสอบจริง (แยกชุด)',
+            subtitle: 'เลือกทำข้อสอบเก่าแยกตามหมวดวิชา หรือกดเข้าโหมดสุ่มข้อสอบจำลอง (Mock Exam) ด้านล่าง',
+            extraBanner:
+                '<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:12px">' +
+                '  <a href="#mock" class="btn-primary">⏱️ สุ่มทำ Mock Exam (15 ข้อ)</a>' +
+                '  <a href="#qbank" class="btn-outline">📚 คลังข้อสอบรวมทั้งหมด (' + ALL_QUESTIONS.length + ' ข้อ)</a>' +
+                '  <a href="#mistakes" class="btn-outline">🔄 ทบทวนข้อที่เคยผิด (' + P.mistakes.length + ')</a>' +
+                '</div>',
+            sets: PAST_EXAM_SETS,
+            routePrefix: 'past-exams'
+        });
+    }
+
     function renderQuizCollection(title, subtitle, questions, emptyMsg) {
         $('#page-title').textContent = title;
-        var html =
+        $('#main').innerHTML =
             '<div class="lesson-wrap">' +
             '  <div class="card">' +
             '    <h1>' + esc(title) + '</h1>' +
@@ -1004,9 +1285,7 @@
             '  <div class="card" id="custom-quiz-host"></div>' +
             '</div>';
 
-        $('#main').innerHTML = html;
         var host = $('#custom-quiz-host');
-
         if (!questions.length) {
             host.innerHTML = '<p style="text-align:center;padding:24px 0;color:var(--mu)">' + esc(emptyMsg) + '</p>';
             return;
@@ -1027,8 +1306,8 @@
 
     function renderQuestionBank() {
         renderQuizCollection(
-            '📚 Question Bank (คลังข้อสอบทั้งหมด)',
-            'รวบรวมข้อสอบทั้งหมด ' + ALL_QUESTIONS.length + ' ข้อจากทุกหมวดวิชา',
+            '📚 Question Bank (คลังข้อสอบรวมทั้งหมด)',
+            'รวบรวมข้อสอบทั้งหมด ' + ALL_QUESTIONS.length + ' ข้อจากทั้งแบบทดสอบท้ายบทและคลังข้อสอบเก่า',
             ALL_QUESTIONS,
             'ยังไม่มีข้อสอบในคลัง'
         );
@@ -1081,8 +1360,8 @@
     function renderProgressPage() {
         $('#page-title').textContent = 'Progress & สำรองข้อมูล';
 
-        var totalTopics = FLAT_TOPICS.length || 1;
-        var doneTopics = FLAT_TOPICS.filter(function (t) { return !!P.v[t.k]; }).length;
+        var totalTopics = READING_TOPICS.length || 1;
+        var doneTopics = READING_TOPICS.filter(function (t) { return !!P.completed[t.k]; }).length;
         var topicPct = Math.round((doneTopics / totalTopics) * 100);
 
         var answeredQs = Object.keys(P.qLog).length;
@@ -1094,7 +1373,7 @@
             '  <div class="card">' +
             '    <h1>📈 สถิติการเรียนของคุณ</h1>' +
             '    <p class="mu">บัญชีที่ใช้งานอยู่: <b>' + esc(currentUser.email) + '</b> · เลเวล ' + (Math.floor(P.xp / 150) + 1) + ' (' + P.xp + ' XP)</p>' +
-            '    <p style="margin:14px 0 6px"><b>บทเรียนที่ผ่านแล้ว:</b> ' + doneTopics + ' / ' + totalTopics + ' บท (' + topicPct + '%)</p>' +
+            '    <p style="margin:14px 0 6px"><b>เนื้อหาที่อ่านแล้ว:</b> ' + doneTopics + ' / ' + totalTopics + ' บท (' + topicPct + '%)</p>' +
             '    <div class="prog-track"><div class="prog-fill" style="width:' + topicPct + '%"></div></div>' +
             '    <p style="margin:14px 0 6px"><b>ความแม่นยำในการทำข้อสอบ:</b> ตอบถูก ' + correctQs + ' / ' + answeredQs + ' ข้อที่เคยทำ (' + accPct + '%)</p>' +
             '    <div class="prog-track"><div class="prog-fill" style="width:' + accPct + '%;background:var(--blue)"></div></div>' +
@@ -1162,6 +1441,16 @@
 
         if (hash === 'home') {
             renderDashboard();
+        } else if (hash === 'videos') {
+            renderVideosPage();
+        } else if (hash === 'quizzes') {
+            renderQuizzesHub(null);
+        } else if (hash.indexOf('quizzes/') === 0) {
+            renderQuizzesHub(hash.split('/')[1]);
+        } else if (hash === 'past-exams') {
+            renderPastExamsHub(null);
+        } else if (hash.indexOf('past-exams/') === 0) {
+            renderPastExamsHub(hash.split('/')[1]);
         } else if (hash === 'prog') {
             renderProgressPage();
         } else if (hash === 'qbank') {
@@ -1172,7 +1461,7 @@
             renderReviewMistakes();
         } else if (hash === 'flashcards') {
             renderAllFlashcards();
-        } else if (hash.indexOf('/') > 0) {
+        } else if (/^[abcd]\//.test(hash)) {
             var parts = hash.split('/');
             renderLessonPage(parts[0], Number(parts[1]));
         } else {
@@ -1205,16 +1494,31 @@
             route();
             return;
         }
-        var matches = FLAT_TOPICS.filter(function (t) {
+        var topicMatches = READING_TOPICS.filter(function (t) {
             return t.t.toLowerCase().indexOf(q) >= 0 || t.catTitle.toLowerCase().indexOf(q) >= 0;
         });
-        $('#nav').innerHTML =
-            '<div class="sb-group-title">ผลการค้นหา (' + matches.length + ')</div>' +
-            (matches.length
-                ? matches.map(function (m) {
-                    return navLink('#' + m.k, '📄', m.t, false);
-                }).join('')
-                : '<div class="mu" style="padding:10px">ไม่พบหัวข้อที่ค้นหา</div>');
+        var videoMatches = ALL_VIDEOS.filter(function (v) {
+            return v.title.toLowerCase().indexOf(q) >= 0 || v.catTitle.toLowerCase().indexOf(q) >= 0;
+        });
+        var examMatches = PAST_EXAM_SETS.filter(function (e) {
+            return e.title.toLowerCase().indexOf(q) >= 0 || e.catTitle.toLowerCase().indexOf(q) >= 0;
+        });
+
+        var resHtml = '';
+        if (topicMatches.length) {
+            resHtml += '<div class="sb-group-title">📖 เนื้อหาอ่าน (' + topicMatches.length + ')</div>' +
+                topicMatches.map(function (m) { return navLink('#' + m.k, '📄', m.t, false); }).join('');
+        }
+        if (videoMatches.length) {
+            resHtml += '<div class="sb-group-title">🎬 คลิปติว (' + videoMatches.length + ')</div>' +
+                videoMatches.map(function (v) { return navLink('#videos', '🎬', v.title, false); }).join('');
+        }
+        if (examMatches.length) {
+            resHtml += '<div class="sb-group-title">📜 ข้อสอบเก่า (' + examMatches.length + ')</div>' +
+                examMatches.map(function (e) { return navLink('#past-exams/' + e.id, '📜', e.title, false); }).join('');
+        }
+
+        $('#nav').innerHTML = resHtml || '<div class="mu" style="padding:10px">ไม่พบหัวข้อที่ค้นหา</div>';
     };
 
     $('#fa').onclick = function () {
